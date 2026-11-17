@@ -10,6 +10,8 @@
   --good-bg: #e6f6ec;
   --bad: #d63939;
   --bad-bg: #fdeaea;
+  --warn: #d9a400;
+  --warn-bg: #fff8e1;
   --radius: 14px;
 }
 @media (prefers-color-scheme: dark) {
@@ -25,6 +27,8 @@
     --good-bg: #16301f;
     --bad: #ff6b6b;
     --bad-bg: #3a1c1c;
+    --warn: #e0b84a;
+    --warn-bg: #2e2716;
   }
 }
 
@@ -148,5 +152,35 @@ td .n { color: var(--muted); font-size: .85rem; }
 .hbar { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; }
 .hbar div { height: 100%; background: var(--accent); }
 .hrow .hval { text-align: right; font-weight: 600; }
+
+.spell {
+  border: 1px solid var(--warn); background: var(--warn-bg); border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 14px;
+}
+.spell p { margin: 0 0 8px; }
+.spell .sugs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.spell .sug { font-weight: 700; background: var(--card); }
+.spell .sug:hover { border-color: var(--accent); color: var(--accent); }
+.spell .small { font-size: .9rem; padding: 6px 12px; }
+
+.home-link { color: var(--muted); text-decoration: none; }
+.home-link:hover { color: var(--accent); }
+
+/* home page */
+.hero { padding: 40px 0 24px; }
+.hero h1 { margin: 0 0 6px; font-size: 2rem; }
+.hero p { margin: 0; color: var(--muted); font-size: 1.05rem; }
+.features { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.feature {
+  display: block; text-decoration: none; color: var(--text);
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px;
+  transition: border-color .15s, transform .15s;
+}
+a.feature:hover { border-color: var(--accent); transform: translateY(-2px); }
+.feature .ico { font-size: 1.8rem; }
+.feature h2 { margin: 8px 0 4px; font-size: 1.15rem; }
+.feature p { margin: 0; color: var(--muted); font-size: .92rem; }
+.feature.soon { opacity: .55; border-style: dashed; }
+.feature .tag { display: inline-block; margin-top: 10px; font-size: .78rem; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 1px 9px; }
 
 .foot { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 24px; }

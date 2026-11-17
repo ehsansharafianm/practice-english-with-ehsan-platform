@@ -93,14 +93,128 @@
   function hide(...ids) { ids.forEach((id) => $(id).classList.add('hidden')); }
 
   // =====================================================
+  // SPELL CHECK for new words (English word list in words.txt,
+  // ordered from most to least common word)
+  // =====================================================
+  const dict = { list: null, set: null, rank: null, loading: null };
+
+  function loadDict() {
+    if (dict.loading) return dict.loading;
+    dict.loading = fetch('words.txt')
+      .then((r) => { if (!r.ok) throw new Error('no list'); return r.text(); })
+      .then((txt) => {
+        dict.list = txt.split(/\r?\n/).filter(Boolean);
+        dict.set = new Set(dict.list);
+        return true;
+      })
+      .catch(() => { dict.loading = null; return false; });
+    return dict.loading;
+  }
+
+  // Optimal string alignment distance (typos: insert, delete, change, swap), stops early above max.
+  function distance(a, b, max) {
+    const la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > max) return max + 1;
+    let prev2 = null, prev = new Array(lb + 1), cur;
+    for (let j = 0; j <= lb; j++) prev[j] = j;
+    for (let i = 1; i <= la; i++) {
+      cur = new Array(lb + 1); cur[0] = i;
+      let rowMin = cur[0];
+      for (let j = 1; j <= lb; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, prev2[j - 2] + 1);
+        cur[j] = v; if (v < rowMin) rowMin = v;
+      }
+      if (rowMin > max) return max + 1;
+      prev2 = prev; prev = cur;
+    }
+    return prev[lb];
+  }
+
+  function suggest(word, n = 5) {
+    const max = word.length <= 4 ? 1 : word.length >= 9 ? 3 : 2;
+    const found = [];
+    const list = dict.list;
+    for (let i = 0; i < list.length; i++) {
+      const w = list[i];
+      if (Math.abs(w.length - word.length) > max) continue;
+      const d = distance(word, w, max);
+      if (d <= max) found.push({ w, d, i });
+    }
+    // Closest spelling first; among equals, the more common word first.
+    found.sort((x, y) => x.d - y.d || x.i - y.i);
+    return found.slice(0, n).map((x) => x.w);
+  }
+
+  // Returns the words in the text that are not in the dictionary.
+  function unknownWords(text) {
+    return text.split(/[\s\-–—]+/)
+      .map((t) => t.replace(/[‘’]/g, "'").replace(/^[^a-zA-Z']+|[^a-zA-Z']+$/g, ''))
+      .filter((t) => t && /^[a-zA-Z']+$/.test(t))
+      .filter((t) => !dict.set.has(t.toLowerCase()) && !dict.set.has(t.toLowerCase().replace(/'s$/, '')));
+  }
+
+  function matchCase(original, sug) {
+    if (original === original.toUpperCase() && original.length > 1) return sug.toUpperCase();
+    if (original[0] === original[0].toUpperCase()) return sug[0].toUpperCase() + sug.slice(1);
+    return sug;
+  }
+
+  let acceptedSpelling = ''; // text the trainer chose to keep even though it looks wrong
+
+  function showSpellBox(text, bad) {
+    const box = $('spellBox');
+    const word = bad[0];
+    const sugs = suggest(word.toLowerCase()).map((s) => matchCase(word, s));
+    box.innerHTML = `
+      <p>⚠ <b>"${esc(word)}"</b> doesn't look like a correct English spelling.</p>
+      ${sugs.length ? `<p class="muted">Did you mean:</p><div class="sugs">${sugs.map((s) => `<button type="button" class="btn ghost small sug" data-sug="${esc(s)}">${esc(s)}</button>`).join('')}</div>`
+                    : '<p class="muted">No suggestions found.</p>'}
+      <div class="row" style="margin-top:0">
+        <button type="button" class="btn ghost small" id="spellKeep">Use "${esc(text)}" anyway</button>
+        <button type="button" class="btn ghost small" id="spellEdit">Edit it myself</button>
+      </div>`;
+    show('spellBox');
+    box.querySelectorAll('.sug').forEach((b) => b.addEventListener('click', () => {
+      const re = new RegExp(`(^|[^a-zA-Z'])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-zA-Z'])`);
+      $('newWord').value = $('newWord').value.replace(re, (m, pre) => pre + b.dataset.sug);
+      hide('spellBox');
+      $('learnForm').requestSubmit(); // re-check (phrases may have more than one problem), then start
+    }));
+    $('spellKeep').addEventListener('click', () => {
+      acceptedSpelling = text;
+      hide('spellBox');
+      $('learnForm').requestSubmit();
+    });
+    $('spellEdit').addEventListener('click', () => { hide('spellBox'); $('newWord').focus(); $('newWord').select(); });
+  }
+
+  $('newWord').addEventListener('focus', loadDict, { once: true });
+  $('newWord').addEventListener('input', () => hide('spellBox'));
+
+  // =====================================================
   // NEW WORD: practise 10 times, then add to the library
   // =====================================================
   const learn = { text: '', note: '', hide: false, results: [], waiting: false };
 
-  $('learnForm').addEventListener('submit', (e) => {
+  $('learnForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = $('newWord').value.trim().replace(/\s+/g, ' ');
     if (!text) return;
+    if (text !== acceptedSpelling) {
+      $('learnStart').disabled = true;
+      $('learnStart').textContent = 'Checking spelling…';
+      const ok = await loadDict();
+      $('learnStart').disabled = false;
+      $('learnStart').textContent = 'Start practice';
+      if (ok) { // if the word list cannot load (offline), skip the check
+        const bad = unknownWords(text);
+        if (bad.length) { showSpellBox(text, bad); return; }
+      }
+    }
+    acceptedSpelling = '';
+    hide('spellBox');
     learn.text = text;
     learn.note = $('newNote').value.trim();
     learn.hide = $('learnHide').checked;
