@@ -82,6 +82,7 @@ body::after {
 
 /* ---------- shared top bar (built by site.js) ---------- */
 .sitebar {
+  position: relative; z-index: 50; /* keeps the account menu above the page content */
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   margin-top: 14px; padding: 10px 12px 10px 14px;
   background: var(--card); border: 1px solid var(--line); border-radius: 18px;
@@ -300,9 +301,10 @@ a.feature:hover { border-color: var(--accent); transform: translateY(-2px); }
 }
 .acct-menu {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: 250px; padding: 14px;
-  background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  background: #ffffff; border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 12px 34px rgba(30, 40, 90, .22);
 }
+:root[data-theme="dark"] .acct-menu { background: #1b1f30; }
 .acct-menu[hidden] { display: none; }
 .acct-who { word-break: break-all; }
 .acct-note { font-size: .85rem; color: var(--muted); margin: 8px 0 10px; }
