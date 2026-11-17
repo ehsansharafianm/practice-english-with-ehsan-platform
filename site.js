@@ -70,5 +70,9 @@
     bar.appendChild(nav);
     bar.appendChild(sw);
     document.body.insertBefore(bar, document.body.firstChild);
+    // Let account.js add the Sign in button to this bar.
+    window.__peweBar = bar;
+    window.__peweBase = base;
+    document.dispatchEvent(new CustomEvent('pewe-bar'));
   });
 })();

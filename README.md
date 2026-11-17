@@ -10,7 +10,11 @@ Live site: https://ehsansharafianm.github.io/practice-english-with-ehsan-platfor
 index.html        Home page (list of practice tools)
 style.css         Shared styles
 site.js           Shared top bar (logo, page tabs, light/dark slider)
+account.js        Student accounts: sign-in dialog and saving to Firebase
+firebase-config.js  Firebase project settings (accounts are off while empty)
+firestore.rules   Database security rules (paste into the Firebase console)
 favicon.svg       Logo / browser tab icon
+teacher/          Teacher dashboard (all students' scores)
 dictation/        Dictation Practice
   index.html
   app.js
@@ -35,8 +39,25 @@ Scoring: each correct answer = 10 points. Checking ignores upper/lower case and 
 
 ### Data
 
-Everything is saved in the browser (`localStorage`). Each person / device has their own library.
+Guests: everything is saved in the browser (`localStorage`), so each device has its own library.
 Use **Export** and **Import** in the Library tab to move words between devices.
+
+Signed-in students: words and scores are also saved to their account (Firestore), so they work on any
+device and the teacher can see them. Guest practice on a device moves into the account at first sign-in.
+
+## Student accounts and teacher dashboard
+
+Sign-in is optional (Google or email + password). The teacher dashboard is at `/teacher/`.
+
+Setup (once):
+1. Create a Firebase project. Turn on **Authentication** with the **Google** and **Email/Password** providers,
+   and add `ehsansharafianm.github.io` under *Authentication → Settings → Authorized domains*.
+2. Create a **Firestore** database (production mode) and publish the rules from `firestore.rules`.
+3. Register a web app and paste its `firebaseConfig` values into `firebase-config.js`.
+4. Sign in on the site once, then in Firestore create a collection `teachers` with a document whose ID is
+   your user ID (shown on the teacher page). That account can now open the dashboard.
+
+Each student is one document `users/{uid}` with `name`, `email`, `words`, `days`, `createdAt`, `lastActive`.
 
 ### Word list
 

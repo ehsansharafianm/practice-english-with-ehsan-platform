@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teacher — Practice English with Ehsan Platform</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css">
+  <script src="../site.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><h1>Teacher dashboard</h1></div>
+  </header>
+
+  <main>
+    <div id="tMsg" class="card">
+      <p class="muted">Loading…</p>
+    </div>
+
+    <section id="tBoard" class="hidden">
+      <div class="card">
+        <div class="lib-head">
+          <h2>Students <span id="tCount" class="muted"></span></h2>
+          <div class="row" style="margin:0">
+            <input id="tSearch" type="search" placeholder="Search students…">
+            <button id="tRefresh" class="btn ghost small" type="button">Refresh</button>
+          </div>
+        </div>
+        <div class="stats" id="tClass"></div>
+        <div class="table-wrap" style="margin-top:14px">
+          <table id="tTable" class="click-rows">
+            <thead><tr>
+              <th>Student</th><th>Last active</th><th>Today</th><th>Last 7 days</th><th>Accuracy</th><th>Words</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="hint">Click a student to see their days and words. "Accuracy" is over all their practice.</p>
+      </div>
+
+      <div id="tDetail" class="card hidden"></div>
+    </section>
+  </main>
+
+  <footer class="foot"><a class="home-link" href="../">Practice English with Ehsan Platform</a> · Teacher</footer>
+  <script type="module" src="../account.js"></script>
+  <script type="module" src="teacher.js"></script>
+</body>
+</html>

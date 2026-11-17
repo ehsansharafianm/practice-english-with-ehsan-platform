@@ -1,0 +1,28 @@
+rules_version = '2';
+// Security rules for the Practice English with Ehsan Platform.
+// Paste into: Firebase console -> Firestore Database -> Rules -> Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // A teacher is a signed-in user whose ID is listed in the "teachers" collection
+    // (added by hand in the Firebase console).
+    function isTeacher() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/teachers/$(request.auth.uid));
+    }
+
+    // One document per student: profile, words and daily scores.
+    match /users/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isTeacher());
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'email', 'createdAt', 'lastActive', 'words', 'days']);
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Teachers list: readable by the teacher themself, never writable from the website.
+    match /teachers/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+  }
+}

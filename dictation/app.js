@@ -1,17 +1,21 @@
 /* Dictation Practice — Practice English with Ehsan Platform
- * All data is stored in this browser (localStorage).
+ * Guests: data is stored in this browser (localStorage).
+ * Signed-in students: data is also saved to their account (see ../account.js),
+ * so it follows them to any device and the teacher can see their scores.
  */
 (() => {
   'use strict';
 
   const TRIES_PER_NEW_WORD = 10;
   const POINTS_PER_CORRECT = 10;
-  const STORE_KEY = 'dictation-practice-v1';
+  const STORE_KEY = 'dictation-practice-v1';       // guest data
+  let storeKey = STORE_KEY;                         // becomes STORE_KEY + ':' + uid when signed in
+  let cloudOK = false;                              // true once the account's data loaded
 
   // ---------- storage ----------
-  function load() {
+  function load(key = storeKey) {
     try {
-      const raw = localStorage.getItem(STORE_KEY);
+      const raw = localStorage.getItem(key);
       if (raw) {
         const d = JSON.parse(raw);
         return { words: d.words || [], days: d.days || {} };
@@ -19,10 +23,59 @@
     } catch (e) { /* ignore */ }
     return { words: [], days: {} };
   }
+  let cloudTimer = null;
   function save() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(storeKey, JSON.stringify(db)); } catch (e) { /* ignore */ }
+    if (window.PEWE && window.PEWE.user && cloudOK) {
+      clearTimeout(cloudTimer);
+      cloudTimer = setTimeout(flushCloud, 1500);
+    }
   }
+  function flushCloud() {
+    clearTimeout(cloudTimer);
+    cloudTimer = null;
+    if (window.PEWE && window.PEWE.user && cloudOK) window.PEWE.save(db).catch((e) => console.warn('Cloud save failed', e));
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudTimer) flushCloud(); });
+
+  // Combine two copies of the data without counting anything twice:
+  // words are matched by spelling (the copy with more tries wins), day totals take the larger value.
+  function merge(a, b) {
+    const out = { words: (a.words || []).map((w) => ({ ...w })), days: JSON.parse(JSON.stringify(a.days || {})) };
+    (b.words || []).forEach((w) => {
+      const i = out.words.findIndex((x) => norm(x.text) === norm(w.text));
+      if (i < 0) out.words.push({ ...w });
+      else if ((w.tries || 0) > (out.words[i].tries || 0)) out.words[i] = { ...w, id: out.words[i].id };
+    });
+    Object.entries(b.days || {}).forEach(([k, v]) => {
+      const d = out.days[k] || (out.days[k] = {});
+      ['tries', 'correct', 'score', 'newWords'].forEach((f) => { d[f] = Math.max(d[f] || 0, v[f] || 0); });
+    });
+    return out;
+  }
+
   let db = load();
+
+  // Sign in / sign out (event from ../account.js)
+  document.addEventListener('pewe-auth', async (e) => {
+    const user = e.detail.user;
+    clearTimeout(cloudTimer);
+    cloudOK = false;
+    if (user) {
+      storeKey = STORE_KEY + ':' + user.uid;
+      let cloud = null;
+      try { cloud = await window.PEWE.load(); cloudOK = true; } catch (err) { console.warn('Could not load account data', err); }
+      // account data + this device's copy of it + anything practised as a guest on this device
+      db = merge(merge(cloud || { words: [], days: {} }, load(storeKey)), load(STORE_KEY));
+      try { localStorage.removeItem(STORE_KEY); } catch (err) { /* ignore */ }
+      save();
+      if (cloudOK) flushCloud();
+    } else {
+      storeKey = STORE_KEY;
+      db = load(storeKey);
+    }
+    refreshViews();
+  });
 
   // ---------- helpers ----------
   const $ = (id) => document.getElementById(id);
@@ -526,6 +579,17 @@
     }
     $('history').innerHTML = rows.join('');
   }
+
+  // Redraw whatever is on screen after the data changed (sign in / sign out).
+  function refreshViews() {
+    updateChip();
+    const active = document.querySelector('.tab.active');
+    if (active) showTab(active.dataset.tab);
+    const hint = $('acctHint');
+    if (hint) hint.classList.toggle('hidden', !(window.PEWE && window.PEWE.enabled && !window.PEWE.user));
+  }
+  const hintBtn = $('acctHintBtn');
+  if (hintBtn) hintBtn.addEventListener('click', () => window.PEWE && window.PEWE.openSignIn && window.PEWE.openSignIn());
 
   // init
   if (canSpeak) window.speechSynthesis.getVoices();
