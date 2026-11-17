@@ -2,20 +2,22 @@
 
 A website with practice tools for learning English. No server, no install: plain HTML, CSS and JavaScript, hosted on GitHub Pages.
 
-Live site: https://ehsansharafianm.github.io/practice-english-with-ehsan/
+Live site: https://ehsansharafianm.github.io/practice-english-with-ehsan-platform/
 
 ## Structure
 
 ```
 index.html        Home page (list of practice tools)
 style.css         Shared styles
+site.js           Shared top bar (logo, page tabs, light/dark slider)
+favicon.svg       Logo / browser tab icon
 dictation/        Dictation Practice
   index.html
   app.js
   words.txt       English word list for the spell check
 ```
 
-Each new practice tool gets its own folder and a card on the home page.
+Each new practice tool gets its own folder, a card on the home page, and an entry in the `PAGES` list in `site.js`.
 
 ## Dictation Practice
 
