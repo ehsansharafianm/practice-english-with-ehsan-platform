@@ -1,4 +1,5 @@
-// Light theme by default; the button switches to dark and the choice is remembered.
+// Light theme by default; the button at the top of each page switches between light and dark,
+// and the choice is remembered.
 (function () {
   var KEY = 'pewe-theme';
   var root = document.documentElement;
@@ -12,7 +13,7 @@
     btn.type = 'button';
     function paint() {
       var dark = root.getAttribute('data-theme') === 'dark';
-      btn.textContent = dark ? '☀️' : '🌙';
+      btn.textContent = dark ? '☀️ Light' : '🌙 Dark';
       btn.title = dark ? 'Switch to light background' : 'Switch to dark background';
       btn.setAttribute('aria-label', btn.title);
     }
@@ -23,6 +24,10 @@
       paint();
     });
     paint();
-    document.body.appendChild(btn);
+    // Top bar on every page that loads this script.
+    var bar = document.createElement('div');
+    bar.className = 'topbar';
+    bar.appendChild(btn);
+    document.body.insertBefore(bar, document.body.firstChild);
   });
 })();

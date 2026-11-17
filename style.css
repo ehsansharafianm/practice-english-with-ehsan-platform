@@ -80,15 +80,16 @@ body::after {
 }
 @media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
 
+.topbar { display: flex; justify-content: flex-end; padding-top: 14px; }
 .theme-toggle {
-  position: fixed; bottom: 16px; right: 16px; z-index: 5;
-  width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.15rem;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer; font: inherit; font-size: .9rem; font-weight: 600;
   border: 1px solid var(--line); background: var(--card); color: var(--text);
   box-shadow: var(--shadow); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-.theme-toggle:hover { border-color: var(--accent); }
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
 
-.top { display: flex; align-items: center; justify-content: space-between; padding: 20px 0 8px; gap: 12px; }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 8px; gap: 12px; }
 .brand h1 { margin: 0; font-size: 1.5rem; }
 .sub { margin: 0; color: var(--muted); font-size: .9rem; }
 .today-chip {
@@ -220,7 +221,7 @@ td .n { color: var(--muted); font-size: .85rem; }
 .home-link:hover { color: var(--accent); }
 
 /* home page */
-.hero { padding: 40px 0 24px; }
+.hero { padding: 16px 0 24px; }
 .hero h1 { margin: 0 0 6px; font-size: 2rem; }
 .hero p { margin: 0; color: var(--muted); font-size: 1.05rem; }
 .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
