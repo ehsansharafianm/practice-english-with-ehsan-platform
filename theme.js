@@ -1,6 +1,6 @@
 // Light theme by default; the button switches to dark and the choice is remembered.
 (function () {
-  var KEY = 'lewe-theme';
+  var KEY = 'pewe-theme';
   var root = document.documentElement;
   var saved = null;
   try { saved = localStorage.getItem(KEY); } catch (e) { /* ignore */ }

@@ -1,4 +1,4 @@
-/* Dictation Practice — English with Ehsan
+/* Dictation Practice — Practice English with Ehsan
  * All data is stored in this browser (localStorage).
  */
 (() => {
@@ -76,6 +76,13 @@
     const v = norm(input.value);
     if (!v) return;
     input.classList.add(norm(target).startsWith(v) ? 'ok' : 'no');
+  }
+
+  // Check automatically once the learner has typed as many letters as the word has
+  // (Enter still works to check early).
+  function reachedEnd(input, target) {
+    const v = input.value.replace(/[‘’]/g, "'").replace(/^\s+/, '').replace(/\s+/g, ' ').toLowerCase();
+    return v.length >= norm(target).length;
   }
 
   // ---------- tabs ----------
@@ -309,7 +316,10 @@
   $('learnCheck').addEventListener('click', learnCheck);
   $('learnInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); learnCheck(); } });
   $('learnCheck').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); learnCheck(); } });
-  $('learnInput').addEventListener('input', () => liveColour($('learnInput'), learn.text));
+  $('learnInput').addEventListener('input', () => {
+    liveColour($('learnInput'), learn.text);
+    if (reachedEnd($('learnInput'), learn.text)) learnCheck();
+  });
   $('learnSpeak').addEventListener('click', () => speak(learn.text));
   $('learnQuit').addEventListener('click', () => {
     if (!confirm('Cancel this word? It will not be added to the library.')) return;
@@ -393,6 +403,11 @@
     review.waiting = true;
     $('reviewCheck').textContent = review.i + 1 >= review.queue.length ? 'Finish' : 'Next';
     $('reviewCheck').focus();
+    // Correct answers move on by themselves; wrong ones wait so the learner can see the right spelling.
+    if (ok) {
+      const at = review.i;
+      setTimeout(() => { if (review.waiting && review.i === at && review.i + 1 < review.queue.length) reviewCheck(); }, 900);
+    }
   }
 
   function finishReview() {
@@ -410,7 +425,10 @@
   $('reviewCheck').addEventListener('click', reviewCheck);
   $('reviewInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); reviewCheck(); } });
   $('reviewCheck').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); reviewCheck(); } });
-  $('reviewInput').addEventListener('input', () => { if (review.showWord || review.hinted) liveColour($('reviewInput'), current().text); });
+  $('reviewInput').addEventListener('input', () => {
+    if (review.showWord || review.hinted) liveColour($('reviewInput'), current().text);
+    if (!review.waiting && reachedEnd($('reviewInput'), current().text)) reviewCheck();
+  });
   $('reviewSpeak').addEventListener('click', () => current() && speak(current().text));
   $('reviewHint').addEventListener('click', () => {
     const w = current(); if (!w || review.waiting) return;

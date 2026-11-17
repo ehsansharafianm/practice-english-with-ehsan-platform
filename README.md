@@ -1,8 +1,8 @@
-# Learn English with Ehsan
+# Practice English with Ehsan
 
 A website with practice tools for learning English. No server, no install: plain HTML, CSS and JavaScript, hosted on GitHub Pages.
 
-Live site: https://ehsansharafianm.github.io/learn-english-with-ehsan/
+Live site: https://ehsansharafianm.github.io/practice-english-with-ehsan/
 
 ## Structure
 
@@ -20,7 +20,8 @@ Each new practice tool gets its own folder and a card on the home page.
 ## Dictation Practice
 
 - **New word** – the trainer types a word (and an optional meaning). The learner hears it and types it 10 times.
-  The box turns green while the spelling is on track and red when it goes wrong. After 10 tries the word is saved to the library.
+  The box turns green while the spelling is on track and red when it goes wrong. The answer is checked automatically
+  as soon as the last letter is typed (Enter also works). After 10 tries the word is saved to the library.
 - **Spell check** – when the trainer adds a word, it is checked against an English word list (about 275,000 words).
   If it looks misspelled, the site suggests corrections. The trainer can pick a suggestion, edit the word, or keep it anyway.
 - **Review** – practise words from the library. The word is read aloud and hidden; the learner types it.
