@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dictation Practice</title>
+  <meta name="description" content="Spelling and dictation practice — English with Ehsan">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Dictation Practice</h1>
+      <p class="sub">English with Ehsan</p>
+    </div>
+    <div class="today-chip" title="Today's score">
+      <span class="chip-label">Today</span>
+      <span id="chipScore">0</span><span class="chip-unit">pts</span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="learn" role="tab">New word</button>
+    <button class="tab" data-tab="review" role="tab">Review</button>
+    <button class="tab" data-tab="library" role="tab">Library</button>
+    <button class="tab" data-tab="today" role="tab">Today</button>
+  </nav>
+
+  <main>
+    <!-- ============ NEW WORD ============ -->
+    <section id="tab-learn" class="panel active">
+      <div id="learnSetup" class="card">
+        <h2>Add a new word</h2>
+        <p class="hint">The trainer types the word. The learner then writes it 10 times. After that it goes into the library.</p>
+        <form id="learnForm" autocomplete="off">
+          <label>Word
+            <input id="newWord" type="text" required maxlength="60"
+                   autocapitalize="off" autocorrect="off" spellcheck="false">
+          </label>
+          <label>Meaning or example sentence <span class="opt">(optional)</span>
+            <input id="newNote" type="text" maxlength="200">
+          </label>
+          <label class="check">
+            <input id="learnHide" type="checkbox">
+            Hide the word while practising (listen only)
+          </label>
+          <button class="btn primary" type="submit">Start practice</button>
+        </form>
+      </div>
+
+      <div id="learnRun" class="card hidden">
+        <div class="run-head">
+          <span id="learnCounter" class="counter">Try 1 of 10</span>
+          <button id="learnSpeak" class="btn ghost" type="button" title="Listen">🔊 Listen</button>
+        </div>
+        <div id="learnTarget" class="target"></div>
+        <div id="learnNote" class="note"></div>
+        <input id="learnInput" class="answer" type="text" placeholder="Type the word and press Enter"
+               autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <div id="learnFeedback" class="feedback" aria-live="polite"></div>
+        <div id="learnDots" class="dots"></div>
+        <div class="row">
+          <button id="learnCheck" class="btn primary" type="button">Check</button>
+          <button id="learnQuit" class="btn ghost" type="button">Cancel</button>
+        </div>
+      </div>
+
+      <div id="learnDone" class="card hidden">
+        <h2>Word added to the library</h2>
+        <div id="learnSummary" class="summary"></div>
+        <div class="row">
+          <button id="learnAgain" class="btn primary" type="button">Add another word</button>
+          <button class="btn ghost" type="button" data-goto="review">Go to review</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ REVIEW ============ -->
+    <section id="tab-review" class="panel">
+      <div id="reviewSetup" class="card">
+        <h2>Review previous words</h2>
+        <p class="hint">Words are read aloud. Type what you hear. Weaker words come up more often.</p>
+        <div id="reviewEmpty" class="empty hidden">The library is empty. Add a word first.</div>
+        <form id="reviewForm">
+          <label>How many words
+            <select id="reviewCount">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+              <option value="all">All words</option>
+            </select>
+          </label>
+          <label class="check">
+            <input id="reviewShow" type="checkbox">
+            Show the word on screen (easier)
+          </label>
+          <button class="btn primary" type="submit">Start review</button>
+        </form>
+      </div>
+
+      <div id="reviewRun" class="card hidden">
+        <div class="run-head">
+          <span id="reviewCounter" class="counter">Word 1 of 10</span>
+          <button id="reviewSpeak" class="btn ghost" type="button">🔊 Listen again</button>
+        </div>
+        <div id="reviewTarget" class="target"></div>
+        <div id="reviewNote" class="note"></div>
+        <input id="reviewInput" class="answer" type="text" placeholder="Type the word and press Enter"
+               autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <div id="reviewFeedback" class="feedback" aria-live="polite"></div>
+        <div class="progress"><div id="reviewBar" class="bar"></div></div>
+        <div class="row">
+          <button id="reviewCheck" class="btn primary" type="button">Check</button>
+          <button id="reviewHint" class="btn ghost" type="button">Show hint</button>
+          <button id="reviewQuit" class="btn ghost" type="button">Stop</button>
+        </div>
+      </div>
+
+      <div id="reviewDone" class="card hidden">
+        <h2>Review finished</h2>
+        <div id="reviewSummary" class="summary"></div>
+        <div class="row">
+          <button id="reviewAgain" class="btn primary" type="button">Review again</button>
+          <button class="btn ghost" type="button" data-goto="today">See today's total</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LIBRARY ============ -->
+    <section id="tab-library" class="panel">
+      <div class="card">
+        <div class="lib-head">
+          <h2>Library <span id="libCount" class="muted"></span></h2>
+          <input id="libSearch" type="search" placeholder="Search…">
+        </div>
+        <div id="libEmpty" class="empty hidden">No words yet.</div>
+        <div class="table-wrap">
+          <table id="libTable">
+            <thead><tr><th>Word</th><th>Accuracy</th><th>Tries</th><th>Added</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="row">
+          <button id="exportBtn" class="btn ghost" type="button">Export (backup file)</button>
+          <label class="btn ghost file-btn">Import
+            <input id="importFile" type="file" accept="application/json,.json" hidden>
+          </label>
+        </div>
+        <p class="hint">Words are saved in this browser. Use Export / Import to move them to another device.</p>
+      </div>
+    </section>
+
+    <!-- ============ TODAY ============ -->
+    <section id="tab-today" class="panel">
+      <div class="card">
+        <h2>Today</h2>
+        <div class="stats">
+          <div class="stat"><div class="stat-val" id="tScore">0</div><div class="stat-lbl">Score</div></div>
+          <div class="stat"><div class="stat-val" id="tAcc">–</div><div class="stat-lbl">Accuracy</div></div>
+          <div class="stat"><div class="stat-val" id="tTries">0</div><div class="stat-lbl">Tries</div></div>
+          <div class="stat"><div class="stat-val" id="tNew">0</div><div class="stat-lbl">New words</div></div>
+        </div>
+        <p class="hint">Each correct answer = 10 points.</p>
+      </div>
+      <div class="card">
+        <h2>Last 7 days</h2>
+        <div id="history" class="history"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">English with Ehsan · Dictation Practice</footer>
+  <script src="app.js"></script>
+</body>
+</html>
