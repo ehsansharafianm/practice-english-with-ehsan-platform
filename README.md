@@ -1,4 +1,4 @@
-# Practice English with Ehsan
+# Practice English with Ehsan Platform
 
 A website with practice tools for learning English. No server, no install: plain HTML, CSS and JavaScript, hosted on GitHub Pages.
 

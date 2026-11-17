@@ -122,6 +122,7 @@ a.site-tab:hover { color: var(--accent); background: var(--bg); }
 
 @media (max-width: 600px) {
   .sitebar { gap: 10px; }
+  .site-brand { flex: 1 1 0; min-width: 0; white-space: normal; line-height: 1.25; }
   .site-brand span { font-size: .9rem; }
   .theme-switch { margin-left: auto; }
   .site-tabs { order: 3; flex-basis: 100%; justify-content: flex-start; overflow-x: auto; }

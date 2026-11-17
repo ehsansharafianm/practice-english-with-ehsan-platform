@@ -1,4 +1,4 @@
-/* Dictation Practice — Practice English with Ehsan
+/* Dictation Practice — Practice English with Ehsan Platform
  * All data is stored in this browser (localStorage).
  */
 (() => {

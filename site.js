@@ -26,7 +26,7 @@
     var brand = document.createElement('a');
     brand.className = 'site-brand';
     brand.href = base;
-    brand.innerHTML = '<img src="' + base + 'favicon.svg" alt="" width="28" height="28"><span>Practice English with Ehsan</span>';
+    brand.innerHTML = '<img src="' + base + 'favicon.svg" alt="" width="28" height="28"><span>Practice English with Ehsan Platform</span>';
 
     var nav = document.createElement('nav');
     nav.className = 'site-tabs';
