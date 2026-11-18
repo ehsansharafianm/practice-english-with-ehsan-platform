@@ -288,6 +288,7 @@
       await speak(cur.text);
       setTimeout(() => { if (mic) mic.stop(); }, 1500);
       r = await p;
+      $('tDoneSpeak').classList.add('hidden');
     } else {
       go.textContent = '👂 Listen…';
       $('sStatus').textContent = 'Listen to the voice…';
@@ -429,7 +430,9 @@
   async function analyse(url) { const { x, sr } = toMono16k(await decode(url)); return analyseSignal(x, sr); }
   window.__peweShadowTest = { analyse, compareWords, expectedTune }; // for developer checks
 
+  let markerN = 0;
   function contourSvg(a, want) {
+    const mid = 'ah' + (++markerN);
     const W = 600, H = 120, P = 10;
     const tMax = a.pts[a.pts.length - 1].t || 1;
     const x = (t) => P + (W - 2 * P - 40) * (t / tMax), y = (s) => H / 2 - Math.max(-8, Math.min(8, s)) * (H / 2 - P) / 8;
@@ -441,8 +444,8 @@
     return `<svg class="contour" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Your voice's melody from start to end">
       <line x1="${P}" x2="${W - 40}" y1="${H / 2}" y2="${H / 2}" class="c-mid"/>
       ${segs.filter((s) => s.length > 1).map((s) => `<polyline points="${s.join(' ')}" class="c-line"/>`).join('')}
-      <path d="${arrow}" class="c-want${ok ? ' ok' : ''}" marker-end="url(#ah)"/>
-      <defs><marker id="ah" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="c-head${ok ? ' ok' : ''}"/></marker></defs>
+      <path d="${arrow}" class="c-want${ok ? ' ok' : ''}" marker-end="url(#${mid})"/>
+      <defs><marker id="${mid}" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="c-head${ok ? ' ok' : ''}"/></marker></defs>
     </svg>`;
   }
 
@@ -552,17 +555,55 @@
   });
 
   const run = { list: [], i: 0, active: false, paused: false, stopping: false, wait: null, results: [] };
-  function rowHtml(k) {
-    const r = run.results[k];
-    const cls = r == null ? '' : r.pct === null ? 'muted' : r.pct >= 80 ? 'acc-good' : 'acc-bad';
-    const val = r == null ? (k === run.i && run.active ? '…' : '') : r.pct === null ? 'skipped' : r.pct + '%';
-    return `<tr class="${k === run.i && run.active ? 'sel' : ''}" data-k="${k}"><td>${k + 1}</td><td class="s-text">${esc(run.list[k])}</td><td class="${cls}">${val}</td></tr>`;
+  // Score table: one row per sentence with its own buttons; click a row to open its analysis.
+  function rowsHtml(tag) {
+    return run.list.map((t, k) => {
+      const r = run.results[k], now = k === run.i && run.active;
+      const cls = r == null ? '' : r.pct === null ? 'muted' : r.pct >= 80 ? 'acc-good' : 'acc-bad';
+      const val = r == null ? (now ? '…' : '') : r.pct === null ? 'skipped' : r.pct + '%';
+      const open = run.open === k && r && r.html;
+      return `<tr class="${now ? 'sel' : ''}${open ? ' open' : ''}" data-k="${k}" title="${r && r.html ? 'Click to see the analysis' : ''}">
+        <td>${k + 1}</td><td class="s-text">${esc(t)}${r && r.html ? ` <span class="muted">${open ? '▴' : '▾'}</span>` : ''}</td><td class="${cls}">${val}</td>
+        <td class="row-acts">
+          <button type="button" class="btn ghost small" data-act="listen" title="Listen to the voice">▶</button>
+          <button type="button" class="btn ghost small" data-act="me" title="Hear my voice"${r && r.audio ? '' : ' disabled'}>🎧</button>
+          <button type="button" class="btn ghost small" data-act="again" title="Repeat this sentence">🔁</button>
+        </td></tr>${open ? `<tr class="row-detail"><td colspan="4">${r.html.replace(/ah(\d+)/g, 'ah$1' + tag)}</td></tr>` : ''}`;
+    }).join('');
   }
   function renderRun() {
-    $('tTable').querySelector('tbody').innerHTML = run.list.map((_, k) => rowHtml(k)).join('');
+    $('tTable').querySelector('tbody').innerHTML = rowsHtml('run');
+    const sum = $('tSumBody'); if (sum) sum.innerHTML = rowsHtml('sum');
     $('tProgress').textContent = `Sentence ${Math.min(run.i + 1, run.list.length)} of ${run.list.length}`;
     $('tBar').style.width = Math.round((run.results.filter((x) => x).length / run.list.length) * 100) + '%';
     $('tPause').textContent = run.paused ? '▶ Resume' : '⏸ Pause';
+  }
+  function playAudio(url) { if (!url) return; if (audioEl) audioEl.pause(); audioEl = new Audio(url); audioEl.play().catch(() => {}); }
+  // Practise sentence k again: during a run it jumps there; after the run it does just that one, then returns to the results.
+  function redoSentence(k) {
+    run.results[k] = null; run.open = null;
+    if (!run.active) {
+      Object.assign(run, { active: true, paused: false, only: true, i: k });
+      $('tDone').classList.add('hidden'); $('tRun').classList.remove('hidden');
+      $('voiceSlotText').appendChild($('voiceBox'));
+      loop(); return;
+    }
+    if (run.paused) { run.i = k; run.paused = false; loop(); return; }
+    run.i = k;
+    if (run.phase === 'wait') { run.redo = true; wake(); }
+    else { run.redoNow = true; if (canSpeak) speechSynthesis.cancel(); if (mic) mic.stop(); }
+  }
+  function onRows(e) {
+    const tr = e.target.closest('tr[data-k]');
+    if (!tr) return;
+    const k = +tr.dataset.k, btn = e.target.closest('[data-act]');
+    if (btn) {
+      if (btn.dataset.act === 'listen') speak(run.list[k], '#none');
+      else if (btn.dataset.act === 'me') playAudio((run.results[k] || {}).audio);
+      else redoSentence(k);
+      return;
+    }
+    if (run.results[k] && run.results[k].html) { run.open = run.open === k ? null : k; renderRun(); }
   }
   // waits that a button can cut short
   function sleep(ms) { return new Promise((res) => { run.wake = () => { clearTimeout(run.wait); run.wake = null; res(); }; run.wait = setTimeout(run.wake, ms); }); }
@@ -573,7 +614,7 @@
     if (!list.length) { $('tMsg').textContent = 'Please paste or import a text first.'; return; }
     if (!SR && !canRecord) { $('tMsg').textContent = 'Recording is not supported in this browser. Try Chrome or Edge.'; return; }
     list = list.slice(0, MAX_TEXT_SENTENCES);
-    Object.assign(run, { list, i: 0, active: true, paused: false, stopping: false, results: [] });
+    Object.assign(run, { list, i: 0, active: true, paused: false, only: false, open: null, results: [] });
     $('tMsg').textContent = '';
     $('tSetup').classList.add('hidden'); $('tDone').classList.add('hidden'); $('tRun').classList.remove('hidden');
     $('voiceSlotText').appendChild($('voiceBox'));
@@ -587,6 +628,8 @@
   }
   async function loopBody() {
     while (run.active && run.i < run.list.length) {
+      while (!run.only && run.i < run.list.length && run.results[run.i]) run.i++; // already done: go on
+      if (run.i >= run.list.length) break;
       if (run.paused) { renderRun(); $('tStatus').innerHTML = 'Paused. Click <b>Resume</b> to go on.'; return; }
       const text = run.list[run.i];
       renderRun();
@@ -603,10 +646,11 @@
         let s = $('tSave').checked ? findSentence(text) : null;
         if ($('tSave').checked && !s) { s = { id: uid(), text: /[.!?,;:]$/.test(text) ? text : text + '.', added: todayKey(), tries: 0, best: 0, last: null }; db.sentences.push(s); day().newWords++; }
         const res = await scoreTry(s || { text }, t.heard, t.a, !!SR);
-        run.results[run.i] = { pct: res.pct, audio: t.audio };
+        run.results[run.i] = { pct: res.pct, audio: t.audio, html: res.html };
         $('tResult').innerHTML = res.html;
         $('tStatus').textContent = '';
       }
+      if (run.only) { run.only = false; run.i = run.list.length; finishRun(); return; }
       run.i++;
       renderRun();
       if (run.i >= run.list.length || !run.active) break;
@@ -626,16 +670,20 @@
     let r;
     if (along) {
       status('🗣️ <b>Speak along</b> with the voice now.');
+      $('tDoneSpeak').classList.remove('hidden');
       const p = listenOnce(est * 2 + 6);
       await speak(text, box);
       setTimeout(() => { if (mic) mic.stop(); }, 1500);
       r = await p;
+      $('tDoneSpeak').classList.add('hidden');
     } else {
       status('👂 Listen…');
       const modelSec = await speak(text, box);
       if (!run.active || run.skipNow || run.redoNow) { run.skipNow = false; return { skipped: true }; }
       status('🎙️ <b>Your turn:</b> say it now, the same way.');
+      $('tDoneSpeak').classList.remove('hidden');
       r = await listenOnce(Math.max(modelSec, est) * 2 + 4);
+      $('tDoneSpeak').classList.add('hidden');
     }
     if (run.skipNow || run.redoNow) { run.skipNow = false; return { skipped: true }; }
     if (r.error === 'not-allowed' || r.error === 'service-not-allowed' || r.error === 'audio-capture') return { fatal: micMessage(r.error) };
@@ -682,13 +730,11 @@
     if (mic) mic.stop();
     finishRun();
   });
-  $('tTable').addEventListener('click', (e) => {
-    const tr = e.target.closest('tr[data-k]');
-    const r = tr && run.results[+tr.dataset.k];
-    if (r && r.audio) { if (audioEl) audioEl.pause(); audioEl = new Audio(r.audio); audioEl.play().catch(() => {}); }
-  });
+  $('tTable').addEventListener('click', onRows);
+  $('tDoneSpeak').addEventListener('click', () => { if (mic) mic.stop(); });
   function finishRun() {
-    run.active = false;
+    run.active = false; run.only = false;
+    $('tDoneSpeak').classList.add('hidden');
     flushCloud();
     $('tRun').classList.add('hidden'); $('tDone').classList.remove('hidden');
     const done = run.results.map((r, k) => ({ r, k })).filter((x) => x.r && x.r.pct !== null);
@@ -698,14 +744,14 @@
       <div class="big-num">${avg === null ? '–' : avg + '%'}</div>
       <div class="line">Average match over ${done.length} sentence${done.length === 1 ? '' : 's'}${run.list.length > done.length ? ` (of ${run.list.length})` : ''}.</div>
       <div class="line">${done.filter((x) => x.r.pct >= 80).length} sentence(s) at 80% or more · today's shadowing score: <b>${(db.days[todayKey()] || {}).score || 0}</b> points.</div>
-      <div class="table-wrap" style="margin-top:12px"><table class="click-rows"><thead><tr><th>#</th><th>Sentence</th><th>Match</th></tr></thead>
-      <tbody>${run.list.map((t, k) => { const r = run.results[k]; return `<tr data-k="${k}"><td>${k + 1}</td><td class="s-text">${esc(t)}</td><td class="${!r || r.pct === null ? 'muted' : r.pct >= 80 ? 'acc-good' : 'acc-bad'}">${!r ? '–' : r.pct === null ? 'skipped' : r.pct + '%'}</td></tr>`; }).join('')}</tbody></table></div>
-      <p class="hint">Click a row to hear your voice for that sentence.</p>`;
-    $('tSummary').querySelector('tbody').onclick = (e) => { const tr = e.target.closest('tr[data-k]'); const r = tr && run.results[+tr.dataset.k]; if (r && r.audio) { if (audioEl) audioEl.pause(); audioEl = new Audio(r.audio); audioEl.play().catch(() => {}); } };
+      <div class="table-wrap" style="margin-top:12px"><table class="click-rows score-rows"><thead><tr><th>#</th><th>Sentence</th><th>Match</th><th></th></tr></thead>
+      <tbody id="tSumBody">${rowsHtml('sum')}</tbody></table></div>
+      <p class="hint">Click a sentence to see its analysis and melody chart. ▶ the voice · 🎧 your voice · 🔁 practise it again.</p>`;
+    $('tSumBody').onclick = onRows;
     $('tWeak').classList.toggle('hidden', !weak.length);
     $('tWeak').textContent = `Practise the ${weak.length} sentence${weak.length === 1 ? '' : 's'} under 80% again`;
     $('tWeak').onclick = () => {
-      Object.assign(run, { list: weak.map((x) => run.list[x.k]), i: 0, active: true, paused: false, stopping: false, results: [] });
+      Object.assign(run, { list: weak.map((x) => run.list[x.k]), i: 0, active: true, paused: false, only: false, open: null, results: [] });
       $('tDone').classList.add('hidden'); $('tRun').classList.remove('hidden');
       loop();
     };
