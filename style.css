@@ -83,14 +83,17 @@ body::after {
 /* ---------- shared top bar (built by site.js) ---------- */
 .sitebar {
   position: relative; z-index: 50; /* keeps the account menu above the page content */
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  margin-top: 14px; padding: 10px 12px 10px 14px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand right" "tabs tabs";
+  align-items: center; gap: 8px 14px;
+  margin-top: 14px; padding: 10px 12px 8px 14px;
   background: var(--card); border: 1px solid var(--line); border-radius: 18px;
   box-shadow: var(--shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
-.site-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--text); font-weight: 700; font-size: .95rem; white-space: nowrap; }
+.site-brand { grid-area: brand; min-width: 0; display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--text); font-weight: 700; font-size: .95rem; white-space: nowrap; }
 .site-brand img { width: 28px; height: 28px; border-radius: 7px; }
-.site-tabs { display: flex; gap: 4px; flex: 1; justify-content: center; }
+.site-tabs { grid-area: tabs; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding-top: 8px; border-top: 1px solid var(--line); }
+.site-tabs::-webkit-scrollbar { display: none; }
+.site-right { grid-area: right; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .site-tab {
   padding: 7px 14px; border-radius: 999px; text-decoration: none; color: var(--muted);
   font-weight: 600; font-size: .92rem; white-space: nowrap;
@@ -122,11 +125,9 @@ a.site-tab:hover { color: var(--accent); background: var(--bg); }
 .theme-switch:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 @media (max-width: 600px) {
-  .sitebar { gap: 10px; }
-  .site-brand { flex: 1 1 0; min-width: 0; white-space: normal; line-height: 1.25; }
+  .site-brand { white-space: normal; line-height: 1.25; }
   .site-brand span { font-size: .9rem; }
-  .theme-switch { margin-left: auto; }
-  .site-tabs { order: 3; flex-basis: 100%; justify-content: flex-start; overflow-x: auto; }
+  .acct-name { display: none; }
 }
 
 .top { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 8px; gap: 12px; }

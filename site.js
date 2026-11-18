@@ -67,11 +67,18 @@
     });
     paint();
 
+    // Account button + theme slider live together in the top-right corner, on every page.
+    var right = document.createElement('div');
+    right.className = 'site-right';
+    right.appendChild(sw);
     bar.appendChild(brand);
+    bar.appendChild(right);
     bar.appendChild(nav);
-    bar.appendChild(sw);
     document.body.insertBefore(bar, document.body.firstChild);
     // Let account.js add the Sign in button to this bar.
+    // On small screens the tabs scroll sideways: show the current page's tab.
+    var act = nav.querySelector('.active');
+    if (act && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = act.offsetLeft - nav.offsetLeft - 16;
     window.__peweBar = bar;
     window.__peweBase = base;
     document.dispatchEvent(new CustomEvent('pewe-bar'));

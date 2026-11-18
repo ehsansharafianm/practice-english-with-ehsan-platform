@@ -96,7 +96,8 @@ async function start() {
   whenBar((bar) => {
     slot = document.createElement('div');
     slot.className = 'acct';
-    bar.insertBefore(slot, bar.querySelector('.theme-switch'));
+    const sw = bar.querySelector('.theme-switch');
+    sw.parentNode.insertBefore(slot, sw);
     paintBar();
   });
 

@@ -28,6 +28,9 @@ tools/build_pron.py  Builds pronunciation/data from the CMU Pronouncing Dictiona
 
 Each new practice tool gets its own folder, a card on the home page, and an entry in the `PAGES` list in `site.js`.
 
+The pages load shared files with a version tag (`style.css?v=...`). Change the tag in all `index.html` files
+when you publish changes to those files, so browsers load the new version instead of an old saved copy.
+
 ## Dictation Practice
 
 - **New word** – the trainer types a word (and an optional meaning). The learner hears it and types it 10 times.
