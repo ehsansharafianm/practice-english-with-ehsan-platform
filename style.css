@@ -417,3 +417,4 @@ code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: .
 .sc-bar.got.half { background: var(--warn); }
 #dMicResult .feedback { text-align: left; }
 .mic-result.center .pscore { justify-content: center; }
+.mic-btn.say-btn { padding: 10px 16px; }

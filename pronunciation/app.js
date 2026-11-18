@@ -653,6 +653,57 @@
     showWord(text, { keep });
   });
 
+  // ---------- add a word by saying it ----------
+  // The browser turns speech into text (Chrome/Edge). The learner confirms the word, picks another
+  // guess, says it again, or types it.
+  let sayRec = null;
+  function hearWord() {
+    return new Promise((resolve) => {
+      const r = new SR();
+      let alts = [], error = '';
+      r.lang = 'en-US'; r.maxAlternatives = 6; r.interimResults = false; r.continuous = false;
+      r.onresult = (e) => { alts = Array.from(e.results[0] || []).map((a) => a.transcript); };
+      r.onerror = (e) => { error = e.error; };
+      r.onend = () => { sayRec = null; resolve({ alts, error }); };
+      sayRec = r;
+      try { r.start(); } catch (e) { sayRec = null; resolve({ alts: [], error: 'busy' }); }
+    });
+  }
+  async function sayToAdd() {
+    const btn = $('wordSay'), box = $('spellBox');
+    if (sayRec) { sayRec.stop(); return; }
+    if (canSpeak) speechSynthesis.cancel();
+    box.classList.add('hidden');
+    btn.classList.add('on'); btn.textContent = '👂 Listening… say one word';
+    const { alts, error } = await hearWord();
+    btn.classList.remove('on'); btn.textContent = '🎙️ Say a word';
+    // unique guesses, at most 5 words each; words we know the pronunciation of come first
+    const seen = new Set(), guesses = [];
+    alts.map((a) => norm(a).split(' ').slice(0, 5).join(' ')).forEach((g) => { if (g && !seen.has(g)) { seen.add(g); guesses.push(g); } });
+    const known = await Promise.all(guesses.map(async (g) => {
+      try { return (await Promise.all(g.split(' ').map((t) => prons(t)))).every((v) => v.length); } catch (e) { return false; }
+    }));
+    const order = guesses.map((g, i) => ({ g, k: known[i], i })).sort((a, b) => (b.k - a.k) || (a.i - b.i)).map((x) => x.g);
+    box.classList.remove('hidden');
+    if (!order.length) {
+      box.innerHTML = `<p>${esc(micMessage(error) || 'I could not catch a word. Click “Say a word” and say it clearly, or type it.')}</p>
+        <div class="row" style="margin-top:0"><button type="button" class="btn ghost small" id="sayAgain">🎙️ Try again</button>
+        <button type="button" class="btn ghost small" id="sayType">⌨️ Type it instead</button></div>`;
+    } else {
+      const [best, ...others] = order;
+      box.innerHTML = `<p>🎙️ Did you say <b>“${esc(best)}”</b>?</p>
+        <div class="row" style="margin-top:0"><button type="button" class="btn primary small heard-pick" data-w="${esc(best)}">✓ Yes, add “${esc(best)}”</button></div>
+        ${others.length ? `<p class="muted" style="margin-top:12px">Or did you mean:</p><div class="sugs">${others.slice(0, 4).map((g) => `<button type="button" class="btn ghost small sug heard-pick" data-w="${esc(g)}">${esc(g)}</button>`).join('')}</div>` : ''}
+        <div class="row" style="margin-top:6px"><button type="button" class="btn ghost small" id="sayAgain">🎙️ No, say it again</button>
+        <button type="button" class="btn ghost small" id="sayType">⌨️ Type it instead</button></div>`;
+    }
+    box.querySelectorAll('.heard-pick').forEach((b) => { b.onclick = () => { $('wordInput').value = b.dataset.w; box.classList.add('hidden'); $('wordForm').requestSubmit(); }; });
+    $('sayAgain').onclick = sayToAdd;
+    $('sayType').onclick = () => { box.classList.add('hidden'); $('wordInput').focus(); $('wordInput').select(); };
+  }
+  if (SR) $('wordSay').onclick = sayToAdd;
+  else $('wordSay').classList.add('hidden');
+
   // ---------- tabs ----------
   function showTab(name) {
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));

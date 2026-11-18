@@ -31,12 +31,13 @@
     <section id="tab-word" class="panel active">
       <div class="card">
         <h2>Add a new word</h2>
-        <p class="hint">Type a word to see its American pronunciation: phonetics, syllables and stress. Listen to a woman's and a man's voice, then record yourself. The word is saved to My words for practice.</p>
+        <p class="hint">Type a word, or click <b>Say a word</b> and say it, to see its American pronunciation: phonetics, syllables and stress. Listen to a woman's and a man's voice, then record yourself. The word is saved to My words for practice.</p>
         <form id="wordForm" autocomplete="off" style="margin-top:4px">
           <div class="row" style="margin-top:0">
             <input id="wordInput" type="text" required maxlength="60" placeholder="e.g. pronunciation"
                    autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1; min-width:180px; margin-top:0">
             <button id="wordAdd" class="btn primary" type="submit">Add word</button>
+            <button id="wordSay" class="btn mic-btn say-btn" type="button" title="Say the word instead of typing it">🎙️ Say a word</button>
           </div>
           <div id="spellBox" class="spell hidden" aria-live="polite"></div>
         </form>
