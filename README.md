@@ -76,15 +76,16 @@ days, months, countries and a few common names. Words are ordered from most to l
 - **Add new word** – type a word (spelling is checked, with suggestions, or keep it anyway) to see its American pronunciation: IPA phonetics, the syllables, and which syllable
   is stressed (the big coloured one; secondary stress has a coloured border). Each syllable also has a simple
   "sounds like" spelling (e.g. pruh · nun · see · AY · shuhn). Listen with a woman's or a man's US voice (normal or
-  slow), or a real recording when the online dictionary has one. Then click **Say it**: the browser checks what you
-  said (Chrome/Edge) and you can play back your own voice to compare. Looked-up words are saved to **My words**.
+  slow),. Then click **Say it**: the browser checks what you
+  said (Chrome/Edge), and the page analyses your recording (loudness, pitch and length of each syllable) to see
+  which syllable you stressed. You get a match score, a bar chart of your stress against the correct stress, and tips.
+  You can play back your own voice to compare. The analysis is approximate: it checks stress, not single sounds. Looked-up words are saved to **My words**.
 - **Practice** – "Say the word" (3 tries per word) or "Find the stress" (click the stressed syllable),
   with words from My words, from Dictation, or both. Weaker words come first. 10 points per correct answer.
 - **My words** – all words with phonetics and how often you got them right, plus today's totals.
 
 Pronunciations come from the CMU Pronouncing Dictionary (BSD licence), split into syllables by `tools/build_pron.py`
-(`python tools/build_pron.py cmudict.dict pronunciation/data`). Meanings and real recordings come from the free
-dictionaryapi.dev. Voices are the device's own; Microsoft Edge has the most natural ones.
+(`python tools/build_pron.py cmudict.dict pronunciation/data`). Phonetics for words missing from the list come from the free dictionaryapi.dev. Voices are the device's own; Microsoft Edge has the most natural ones.
 Signed-in students' pronunciation data is saved in the `pron` field of their `users/{uid}` document.
 
 ## Run locally

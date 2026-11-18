@@ -393,3 +393,27 @@ code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: .
 .syls.pick .syl { cursor: pointer; }
 .syls.pick .syl:hover { border-color: var(--accent); transform: translateY(-2px); }
 .saved-note { color: var(--good); }
+
+/* Pronunciation: score, stress chart and tips after "Say it" */
+.pscore { display: flex; align-items: baseline; gap: 10px; margin: 12px 0 6px; }
+.pscore-num { font-size: 2rem; font-weight: 800; }
+.pscore-lbl { color: var(--muted); font-size: .9rem; }
+.pscore.good .pscore-num { color: var(--good); }
+.pscore.mid .pscore-num { color: var(--warn); }
+.pscore.low .pscore-num { color: var(--bad); }
+.stress-chart { display: flex; gap: 10px; align-items: flex-end; margin: 10px 0 2px; max-width: 420px; }
+.mic-result.center .stress-chart { margin-left: auto; margin-right: auto; }
+.sc-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 40px; }
+.sc-bar-wrap { height: 80px; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.sc-bar { width: 70%; max-width: 44px; border-radius: 6px 6px 2px 2px; background: var(--line); }
+.sc-bar.got { background: var(--good); }
+.sc-bar.got.off { background: var(--bad); }
+.sc-lbl { font-size: .85rem; font-weight: 600; padding: 2px 6px; border-radius: 6px; }
+.sc-lbl.want { background: var(--accent); color: var(--accent-ink); }
+.sc-key { font-size: .8rem; margin-bottom: 6px; }
+.ptips { margin: 6px 0 4px; padding-left: 20px; text-align: left; }
+.ptips li { margin: 4px 0; }
+.mic-result.center .ptips { display: inline-block; max-width: 520px; }
+.sc-bar.got.half { background: var(--warn); }
+#dMicResult .feedback { text-align: left; }
+.mic-result.center .pscore { justify-content: center; }

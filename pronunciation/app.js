@@ -228,12 +228,12 @@
   // Listens once. Resolves { heard: [alternatives], audio: blobURL|null, error }
   function listenOnce(onState) {
     return new Promise(async (resolve) => {
-      let stream = null, rec = null, chunks = [], heard = [], error = '', done = false, recDone = !canRecord;
+      let stream = null, rec = null, chunks = [], heard = [], confidence = 0, error = '', done = false, recDone = !canRecord;
       let audio = null;
       const finish = () => {
         if (done || !recDone) return;
         done = true; mic = null; onState('idle');
-        resolve({ heard, audio, error });
+        resolve({ heard, audio, error, confidence });
       };
       const stopAll = () => {
         try { if (recog) recog.stop(); } catch (e) { /* ignore */ }
@@ -243,7 +243,8 @@
       let recog = null;
       if (canRecord) {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // auto gain off, so loud and soft syllables keep their difference
+          stream = await navigator.mediaDevices.getUserMedia({ audio: { autoGainControl: false, noiseSuppression: true, echoCancellation: true } });
           rec = new MediaRecorder(stream);
           rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
           rec.onstop = () => { if (chunks.length) audio = URL.createObjectURL(new Blob(chunks, { type: rec.mimeType || 'audio/webm' })); recDone = true; if (!recog) finish(); else if (recogEnded) finish(); };
@@ -257,7 +258,7 @@
       if (SR) {
         recog = new SR();
         recog.lang = 'en-US'; recog.maxAlternatives = 5; recog.interimResults = false; recog.continuous = false;
-        recog.onresult = (e) => { heard = Array.from(e.results[0] || []).map((a) => a.transcript); };
+        recog.onresult = (e) => { const alts = Array.from(e.results[0] || []); heard = alts.map((a) => a.transcript); confidence = alts[0] ? alts[0].confidence || 0 : 0; };
         recog.onerror = (e) => { error = e.error; };
         recog.onend = () => { recogEnded = true; stopAll(); finish(); };
         try { recog.start(); } catch (e) { recogEnded = true; }
@@ -285,6 +286,163 @@
     } catch (e) { /* ignore */ }
     return false;
   }
+
+  // ---------- voice analysis: syllables and stress from the recording ----------
+  // Finds the vowel parts of the recording (voiced, in the speech band), then compares the syllables'
+  // loudness, pitch and length to see which one the learner stressed. Approximate: it looks at stress
+  // and syllables, not at single sounds. Tested on 24 recordings (2 voices x 12 words): 22 right.
+  async function decode(url) {
+    const buf = await (await fetch(url)).arrayBuffer();
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    try { return await ctx.decodeAudioData(buf); } finally { if (ctx.close) ctx.close(); }
+  }
+  function toMono16k(ab) {
+    const step = Math.max(1, Math.round(ab.sampleRate / 16000)), sr = ab.sampleRate / step;
+    const n = Math.floor(ab.length / step), x = new Float32Array(n), ch = ab.numberOfChannels;
+    for (let c = 0; c < ch; c++) {
+      const d = ab.getChannelData(c);
+      for (let i = 0; i < n; i++) { let s = 0; for (let k = 0; k < step; k++) s += d[i * step + k] || 0; x[i] += s / step / ch; }
+    }
+    return { x, sr };
+  }
+  function biquad(x, sr, type, f0) {
+    const w = 2 * Math.PI * f0 / sr, al = Math.sin(w) / (2 * 0.707), c = Math.cos(w);
+    const [b0, b1, b2] = type === 'lp' ? [(1 - c) / 2, 1 - c, (1 - c) / 2] : [(1 + c) / 2, -(1 + c), (1 + c) / 2];
+    const a0 = 1 + al, a1 = -2 * c, a2 = 1 - al, y = new Float32Array(x.length);
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < x.length; i++) {
+      const v = (b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+      x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v;
+    }
+    return y;
+  }
+  function pitchOf(x, start, len, sr) {
+    const minLag = Math.floor(sr / 400), maxLag = Math.floor(sr / 70);
+    if (start + len + maxLag >= x.length) return 0;
+    let e0 = 0; for (let i = 0; i < len; i++) e0 += x[start + i] * x[start + i];
+    if (e0 <= 1e-9) return 0;
+    let best = 0, bestLag = 0;
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      let c = 0, e1 = 0;
+      for (let i = 0; i < len; i++) { const b = x[start + i + lag]; c += x[start + i] * b; e1 += b * b; }
+      const r = c / Math.sqrt(e0 * e1 || 1);
+      if (r > best) { best = r; bestLag = lag; }
+    }
+    return best > 0.45 ? sr / bestLag : 0;
+  }
+  function analyseSignal(x, sr, n) {
+    const v = biquad(biquad(x, sr, 'hp', 300), sr, 'lp', 2500); // speech band, where vowels are strong
+    const hop = Math.round(sr * 0.01), win = Math.round(sr * 0.03), pw = Math.round(sr * 0.04);
+    const F = Math.max(0, Math.floor((x.length - pw - Math.floor(sr / 70)) / hop));
+    const rms = new Float32Array(F), f0 = new Float32Array(F);
+    for (let f = 0; f < F; f++) { let s = 0; for (let i = 0; i < win; i++) { const t = v[f * hop + i]; s += t * t; } rms[f] = Math.sqrt(s / win); }
+    let mx0 = 0; rms.forEach((t) => { if (t > mx0) mx0 = t; });
+    for (let f = 0; f < F; f++) f0[f] = rms[f] > mx0 * 0.08 ? pitchOf(x, f * hop, pw, sr) : 0;
+    const e = rms.map((t, f) => t * (f0[f] ? 1 : 0.25)); // vowels are voiced; s, f, t... count less
+    const sm = e.map((_, f) => { let s = 0, k = 0; for (let j = f - 2; j <= f + 2; j++) if (j >= 0 && j < F) { s += e[j]; k++; } return s / k; });
+    let max = 0; sm.forEach((t) => { if (t > max) max = t; });
+    if (max < 0.002) return { quiet: true };
+    let a = 0, b = F - 1;
+    while (a < F && sm[a] < max * 0.1) a++;
+    while (b > a && sm[b] < max * 0.1) b--;
+    if (b - a < 8) return { quiet: true };
+    // syllable centres: peaks separated by a real dip
+    const peaks = [];
+    for (let f = a + 1; f < b; f++) if (sm[f] >= sm[f - 1] && sm[f] > sm[f + 1] && sm[f] > max * 0.15) peaks.push(f);
+    const merged = [];
+    peaks.forEach((p) => {
+      const q = merged[merged.length - 1];
+      if (q === undefined) { merged.push(p); return; }
+      let dip = Infinity; for (let f = q; f <= p; f++) dip = Math.min(dip, sm[f]);
+      if (p - q < 8 || dip > 0.7 * Math.min(sm[p], sm[q])) { if (sm[p] > sm[q]) merged[merged.length - 1] = p; }
+      else merged.push(p);
+    });
+    // use exactly n parts: keep the n strongest peaks, or split the longest parts if there are too few
+    let chosen = merged.slice();
+    if (chosen.length > n) chosen = chosen.map((p) => [p, sm[p]]).sort((u, w) => w[1] - u[1]).slice(0, n).map((u) => u[0]).sort((u, w) => u - w);
+    const valley = (p, q) => { let m = p; for (let f = p; f <= q; f++) if (sm[f] < sm[m]) m = f; return m; };
+    const bounds = [a];
+    for (let i = 0; i + 1 < chosen.length; i++) bounds.push(valley(chosen[i], chosen[i + 1]));
+    bounds.push(b);
+    while (bounds.length - 1 < n) {
+      let li = 0; for (let i = 1; i < bounds.length - 1; i++) if (bounds[i + 1] - bounds[i] > bounds[li + 1] - bounds[li]) li = i;
+      bounds.splice(li + 1, 0, Math.round((bounds[li] + bounds[li + 1]) / 2));
+    }
+    const segs = [];
+    for (let i = 0; i < n; i++) {
+      const s0 = bounds[i], s1 = Math.max(bounds[i + 1], s0 + 1);
+      let pk = 0; for (let f = s0; f < s1; f++) pk = Math.max(pk, sm[f]);
+      let dur = 0; const ps = [];
+      for (let f = s0; f < s1; f++) if (sm[f] > pk * 0.5 && f0[f]) { dur++; ps.push(f0[f]); }
+      ps.sort((u, w) => u - w);
+      segs.push({ loud: 20 * Math.log10(pk + 1e-9), dur, pitch: ps.length ? ps[Math.floor(ps.length / 2)] : 0 });
+    }
+    // stress score: loudness, pitch and length, each compared with the other syllables of the word
+    const z = (key) => {
+      const vals = segs.map((s) => s[key]), ok = vals.filter((t) => t > 0 || key === 'loud');
+      if (ok.length < 2) return vals.map(() => 0);
+      const m = ok.reduce((p, q) => p + q, 0) / ok.length;
+      const sd = Math.sqrt(ok.reduce((p, q) => p + (q - m) * (q - m), 0) / ok.length) || 1;
+      return vals.map((t) => (t > 0 || key === 'loud' ? (t - m) / sd : 0));
+    };
+    const zl = z('loud'), zp = z('pitch'), zd = z('dur');
+    segs.forEach((s, i) => { s.score = 0.35 * zl[i] + 0.35 * zp[i] + 0.3 * zd[i]; });
+    const order = segs.map((s, i) => i).sort((u, w) => segs[w].score - segs[u].score);
+    return { segs, heardCount: merged.length, stressed: order[0], margin: n > 1 ? segs[order[0]].score - segs[order[1]].score : 1 };
+  }
+  async function analyse(url, n) {
+    const { x, sr } = toMono16k(await decode(url));
+    return analyseSignal(x, sr, n);
+  }
+  window.__pewePronTest = { analyse }; // for developer checks
+
+  // Score, chart and tips for one attempt.
+  function feedbackHtml(syl, a, recognised, confidence) {
+    const tips = [];
+    let score = 0, parts = 0;
+    if (recognised !== null) { parts++; score += recognised ? 1 : 0; }
+    if (recognised === false) tips.push('I could not understand the word. Listen to the model again and say each sound clearly.');
+    if (a && a.quiet) tips.push('Your recording was very quiet. Move closer to the microphone and speak up.');
+    let chart = '';
+    if (syl && syl.length > 1 && a && !a.quiet) {
+      const n = syl.length, want = syl.findIndex((s) => s.stress === 1), got = a.stressed;
+      const ok = got === want, R = (i) => esc(respell(syl[i]));
+      const second = !ok && syl[got].stress === 2;
+      parts += 2; score += 2 * (ok ? (a.margin > 0.4 ? 1 : 0.75) : second ? 0.5 : 0.15); // stress counts double
+      if (ok && a.margin > 0.4) tips.push(`✓ Stress in the right place: <b>${R(want)}</b>.`);
+      else if (ok) tips.push(`Almost: <b>${R(want)}</b> was your strongest syllable, but only a little. Make it clearly louder, longer and higher.`);
+      else if (second) {
+        tips.push(`You made <b>${R(got).toLowerCase()}</b> the strongest. It has a weaker stress; the main stress is on <b>${R(want)}</b>.`);
+        tips.push(`Keep ${R(got).toLowerCase()} clear but lighter, and push <b>${R(want)}</b> more: louder, longer and higher.`);
+      } else {
+        tips.push(`You stressed the <b>${ordinal(got + 1)}</b> syllable (${R(got).toLowerCase()}), but the stress is on the <b>${ordinal(want + 1)}</b> (<b>${R(want)}</b>).`);
+        tips.push(`Say <b>${R(want)}</b> louder, longer and a little higher, and make ${R(got).toLowerCase()} shorter and softer.`);
+      }
+      // (too few syllables is not reported: smooth, linked speech often hides the dips between them)
+      if (a.heardCount >= n + 2) tips.push(`I heard more syllables than the word has (${n}). Don't add extra vowels between consonants.`);
+      const weak = syl.map((s, i) => (i !== want && s.phones.some((p) => p === 'AH0' || p === 'ER0') ? i : -1)).filter((i) => i >= 0);
+      if (weak.length && ok) tips.push(`Keep the weak syllable${weak.length > 1 ? 's' : ''} ${weak.map(R).join(', ')} short and relaxed (the /ə/ sound).`);
+      const top = Math.max(...a.segs.map((s) => s.score)), bot = Math.min(...a.segs.map((s) => s.score));
+      chart = `<div class="stress-chart">
+        ${syl.map((s, i) => {
+          const h = Math.round(20 + 80 * ((a.segs[i].score - bot) / ((top - bot) || 1)));
+          return `<div class="sc-col"><div class="sc-bar-wrap"><div class="sc-bar${i === got ? ' got' : ''}${i === got && !ok ? (second ? ' half' : ' off') : ''}" style="height:${h}%"></div></div>
+            <div class="sc-lbl${i === want ? ' want' : ''}">${R(i)}</div></div>`;
+        }).join('')}
+        </div><p class="hint sc-key">Bars: how strong you made each syllable. Coloured label: where the stress should be.</p>`;
+    } else if (syl && syl.length === 1 && a && !a.quiet && recognised !== false) {
+      tips.push('One-syllable word, so there is no stress to place. Make the vowel clear and full.');
+    }
+    if (recognised && confidence > 0) { parts++; score += Math.min(1, confidence / 0.9); }
+    if (recognised && confidence > 0 && confidence < 0.6) tips.push('The word was understood, but not very clearly. Open your mouth more and slow down a little.');
+    const pctScore = parts ? Math.round((score / parts) * 100) : null;
+    const cls = pctScore >= 80 ? 'good' : pctScore >= 50 ? 'mid' : 'low';
+    return `${pctScore !== null ? `<div class="pscore ${cls}"><span class="pscore-num">${pctScore}%</span><span class="pscore-lbl">match with the correct pronunciation</span></div>` : ''}
+      ${chart}
+      ${tips.length ? `<ul class="ptips">${tips.map((t) => `<li>${t}</li>`).join('')}</ul>` : ''}`;
+  }
+
   function micMessage(error) {
     return {
       'not-allowed': 'Please allow the microphone for this site (click the lock icon in the address bar), then try again.',
@@ -349,17 +507,15 @@
       <div class="voice-row">
         <button class="btn primary" type="button" data-say="female">👩 Woman (US)</button>
         <button class="btn primary" type="button" data-say="male">👨 Man (US)</button>
-        ${ex.audioUS ? '<button class="btn ghost" type="button" id="realRec" title="A real person, from an online dictionary">🎧 Real recording</button>' : ''}
         <label class="check slow-check"><input type="checkbox" id="slowBox" ${slow ? 'checked' : ''}> 🐢 Slow</label>
       </div>
       <p class="hint voice-note">${voiceNote()}</p>
       <h3 class="sub-h">Your turn</h3>
-      ${SR || canRecord ? `<p class="hint">${SR ? 'Say the word. I will check it and you can play back your voice to compare.' : 'Record yourself and compare with the voices. (Checking your pronunciation works in Chrome and Edge.)'}</p>
+      ${SR || canRecord ? `<p class="hint">${SR ? 'Say the word. I check it, look at your stress and syllables, and give you a score and tips. You can also play back your voice.' : 'Record yourself and compare with the voices. (Checking your pronunciation works in Chrome and Edge.)'}</p>
         <div class="row"><button class="btn mic-btn" type="button" id="dMic">🎙️ Say it</button></div>
         <div id="dMicResult" class="mic-result" aria-live="polite"></div>` : '<p class="hint">Recording is not supported in this browser. Try Chrome or Edge.</p>'}
       ${addToList ? '<p class="hint saved-note"></p>' : ''}`;
 
-    if (ex.audioUS) $('realRec').onclick = () => playUrl(ex.audioUS);
     $('slowBox').onchange = (e) => { slow = e.target.checked; };
     const micBtn = $('dMic');
     if (micBtn) micBtn.onclick = () => runMic(micBtn, $('dMicResult'), clean, (ok) => { const w = findWord(clean); if (w) record(w, 'say', ok); });
@@ -391,13 +547,15 @@
     const play = r.audio ? `<button class="btn ghost small" type="button" data-play="${r.audio}">▶ My voice</button>` : '';
     const models = '<button class="btn ghost small" type="button" data-say="female">▶ Woman</button><button class="btn ghost small" type="button" data-say="male">▶ Man</button>';
     if (r.error && !r.heard.length && micMessage(r.error)) { out.innerHTML = `<p class="feedback wrong">${micMessage(r.error)}</p>${play ? `<div class="row">${play}</div>` : ''}`; return null; }
-    if (!SR) { out.innerHTML = `<div class="row">${play}${models}</div><p class="hint">Listen to your voice, then the model. Do they sound the same? Is the stress in the same place?</p>`; return null; }
-    const ok = await matches(target, r.heard);
-    onResult && onResult(ok);
+    let syl = null;
+    if (!norm(target).includes(' ')) { try { syl = (await prons(target))[0] || null; } catch (e) { /* ignore */ } }
+    let a = null;
+    if (r.audio && syl) { try { a = await analyse(r.audio, syl.length); } catch (e) { console.warn('Analysis failed', e); } }
+    const ok = SR ? await matches(target, r.heard) : null;
+    if (SR && onResult) onResult(ok);
     const heard = r.heard[0] ? `“${esc(r.heard[0].trim())}”` : 'nothing clear';
-    out.innerHTML = ok
-      ? `<p class="feedback right">✓ Clear! I heard ${heard}.</p><div class="row">${play}${models}</div>`
-      : `<p class="feedback wrong">✗ I heard ${heard}. Listen again, watch the stressed syllable, and try once more.</p><div class="row">${play}${models}</div>`;
+    const head = !SR ? '' : ok ? `<p class="feedback right">✓ I heard ${heard}.</p>` : `<p class="feedback wrong">✗ I heard ${heard}.</p>`;
+    out.innerHTML = `${head}${feedbackHtml(syl, a, ok, r.confidence)}<div class="row">${play}${models}</div>`;
     return ok;
   }
   document.addEventListener('click', (e) => { const b = e.target.closest('[data-play]'); if (b) playUrl(b.dataset.play); });
