@@ -84,6 +84,7 @@
       if (WH.has(first)) return { end: 'fall', why: 'This is a <b>wh- question</b> (what, where, how…): the voice <b>falls</b> at the end ↘.' };
       return { end: 'rise', why: AUX.has(first) ? 'This is a <b>yes/no question</b>: the voice <b>rises</b> at the end ↗.' : 'This is a question: the voice <b>rises</b> at the end ↗.' };
     }
+    if (/[,;:]\s*$/.test(t) || !/[.!?]["'”’)\]]*\s*$/.test(t)) return { end: 'rise', soft: true, why: 'This part continues the sentence: keep your voice <b>up</b> (or a small rise ↗). Don\'t let it fall yet.' };
     if (/!\s*$/.test(t)) return { end: 'fall', why: 'This is an exclamation: strong stress, and the voice <b>falls</b> at the end ↘.' };
     return { end: 'fall', why: 'This is a <b>statement</b>: the voice <b>falls</b> at the end ↘.' };
   }
@@ -124,7 +125,7 @@
   $('voiceSel').addEventListener('change', () => { try { localStorage.setItem(VOICE_KEY, $('voiceSel').value); } catch (e) { /* ignore */ } });
 
   // Reads the sentence, lighting up each word as it is spoken. Resolves when the voice has finished.
-  function speak(text) {
+  function speak(text, box = '#sShow') {
     return new Promise((resolve) => {
       if (!canSpeak || !text) return resolve(0);
       speechSynthesis.cancel();
@@ -133,7 +134,7 @@
       if (v) u.voice = v;
       u.lang = 'en-US';
       u.rate = $('slowBox').checked ? 0.7 : 0.95;
-      const spans = [...document.querySelectorAll('#sShow .sw')];
+      const spans = [...document.querySelectorAll(box + ' .sw')];
       const mark = (i) => spans.forEach((s) => s.classList.toggle('now', +s.dataset.s <= i && i < +s.dataset.e));
       u.onboundary = (e) => { if (e.name === 'word' || e.name === undefined) mark(e.charIndex); };
       const t0 = performance.now();
@@ -257,6 +258,7 @@
     cur = s;
     if (!fromQueue) queue = [];
     $('shadow').classList.remove('hidden');
+    $('voiceSlotOne').appendChild($('voiceBox'));
     $('sShow').innerHTML = sentenceHtml(s.text);
     const tune = expectedTune(s.text);
     $('sTune').innerHTML = `${tune.why} <b>Bold</b> words carry the stress: say them a little louder, longer and higher.`;
@@ -305,7 +307,7 @@
     let a = null;
     if (r.audio) { try { a = await analyse(r.audio); } catch (e) { console.warn('Analysis failed', e); } }
     $('sStatus').textContent = '';
-    showResult(cur, r.heard, a, !!SR);
+    $('sResult').innerHTML = (await scoreTry(cur, r.heard, a, !!SR)).html;
   });
   let audioEl = null;
   $('sMine').addEventListener('click', () => { if (!lastAudio) return; if (audioEl) audioEl.pause(); audioEl = new Audio(lastAudio); audioEl.play().catch(() => {}); });
@@ -444,7 +446,7 @@
     </svg>`;
   }
 
-  async function showResult(s, heard, a, haveSR) {
+  async function scoreTry(s, heard, a, haveSR) {
     const tune = expectedTune(s.text);
     const toks = wordsOf(s.text);
     const tips = [];
@@ -468,9 +470,10 @@
     else if (a && a.noPitch) tips.push('I could not follow your voice melody. Speak a bit louder, in a quiet place.');
     else if (a) {
       parts += 3;
-      const endOk = a.end === tune.end;
+      const endOk = a.end === tune.end || (tune.soft && a.end === 'level');
       score += 3 * (endOk ? 1 : a.end === 'level' ? 0.4 : 0);
-      if (endOk) tips.push(`✓ Good melody at the end: your voice ${tune.end === 'rise' ? 'rose ↗' : 'fell ↘'}, as it should.`);
+      if (endOk) tips.push(tune.soft ? '✓ Good: your voice stayed up, so the sentence sounds unfinished, as it should.' : `✓ Good melody at the end: your voice ${tune.end === 'rise' ? 'rose ↗' : 'fell ↘'}, as it should.`);
+      else if (tune.soft) tips.push('Your voice fell here ↘, so it sounds like the end. This part goes on: keep your voice <b>up</b>.');
       else if (tune.end === 'fall') tips.push(a.end === 'rise' ? 'Your voice went <b>up</b> at the end ↗. In this sentence it should go <b>down</b> ↘ on the last stressed word, to sound finished and sure.' : 'Your voice stayed <b>flat</b> at the end. Let it <b>fall</b> ↘ on the last stressed word.');
       else tips.push(a.end === 'fall' ? 'Your voice went <b>down</b> at the end ↘. For a yes/no question, let it go <b>up</b> ↗ on the last word.' : 'Your voice stayed <b>flat</b> at the end. For this question, let it go <b>up</b> ↗ on the last word.');
       if (a.range < 1.6) tips.push('Your voice sounds quite <b>flat</b>. American English goes up and down more: make the <b>bold</b> words higher and louder.');
@@ -490,18 +493,232 @@
       save(); updateChip();
     }
     const cls = pct >= 80 ? 'good' : pct >= 50 ? 'mid' : 'low';
-    $('sResult').innerHTML = `
+    return { pct, html: `
       ${pct !== null ? `<div class="pscore ${cls}"><span class="pscore-num">${pct}%</span><span class="pscore-lbl">match with the model${pct >= 80 ? ' · +10 points' : ''}</span></div>` : ''}
       ${wordsHtml}${chart}
       ${tips.length ? `<ul class="ptips">${tips.map((t) => `<li>${t}</li>`).join('')}</ul>` : ''}
-      ${!haveSR ? '<p class="hint">Word checking works in Chrome and Edge. Here you can still compare your melody and play back your voice.</p>' : ''}`;
+      ${!haveSR ? '<p class="hint">Word checking works in Chrome and Edge. Here you can still compare your melody and play back your voice.</p>' : ''}` };
   }
+
+
+  // =====================================================
+  // SHADOW A TEXT: paste or import a text; the page goes through it sentence by sentence on its own:
+  // read the sentence, record the learner, score it, then move on to the next one.
+  // =====================================================
+  const MAX_TEXT_SENTENCES = 60;
+  const ABBR = /\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc|e\.g|i\.e|U\.S|U\.K|a\.m|p\.m|No)\.$/i;
+  // Split a text into sentences; long ones (more than MAX_WORDS) are cut at commas, or into even parts.
+  function splitText(text) {
+    const out = [];
+    String(text || '').replace(/\r/g, '').split(/\n\s*\n|\n(?=\s*[-•*\d]+[.)]?\s)/).forEach((para) => {
+      const flat = clean(para.replace(/\n/g, ' '));
+      if (!flat) return;
+      let buf = '';
+      flat.split(' ').forEach((w) => {
+        buf = buf ? buf + ' ' + w : w;
+        if (/[.!?]["'”’)\]]*$/.test(w) && !ABBR.test(w.replace(/["'”’)\]]+$/, ''))) { out.push(buf); buf = ''; }
+      });
+      if (buf) out.push(buf);
+    });
+    const pieces = [];
+    const cut = (s) => {
+      const ws = s.split(' ');
+      if (wordsOf(s).length <= MAX_WORDS) { pieces.push(s); return; }
+      // the comma nearest the middle, keeping both halves at least 3 words
+      let best = -1, bestD = Infinity;
+      ws.forEach((w, i) => { if (/[,;:]$/.test(w) && i >= 2 && i <= ws.length - 4) { const d = Math.abs(i - ws.length / 2); if (d < bestD) { bestD = d; best = i; } } });
+      if (best < 0) { const parts = Math.ceil(ws.length / 15), size = Math.ceil(ws.length / parts); for (let i = 0; i < ws.length; i += size) pieces.push(ws.slice(i, i + size).join(' ')); return; }
+      cut(ws.slice(0, best + 1).join(' ')); cut(ws.slice(best + 1).join(' '));
+    };
+    out.forEach(cut);
+    // very short bits (one word) join the one before
+    const merged = [];
+    pieces.forEach((p) => { if (wordsOf(p).length < 2 && merged.length) merged[merged.length - 1] += ' ' + p; else if (wordsOf(p).length) merged.push(p); });
+    return merged;
+  }
+  function updateTextCount() {
+    const n = splitText($('tText').value).length;
+    $('tCount').textContent = n ? `${n} sentence${n === 1 ? '' : 's'}${n > MAX_TEXT_SENTENCES ? ` — only the first ${MAX_TEXT_SENTENCES} will be used` : ''}` : '';
+  }
+  $('tText').addEventListener('input', updateTextCount);
+  $('tFile').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    if (f.size > 200000) { $('tMsg').textContent = 'This file is too big. Please use a shorter text (a page or two).'; return; }
+    $('tText').value = (await f.text()).replace(/\r/g, '').trim();
+    $('tMsg').textContent = $('tText').value ? `Loaded “${f.name}”.` : 'This file has no text in it.';
+    updateTextCount();
+  });
+
+  const run = { list: [], i: 0, active: false, paused: false, stopping: false, wait: null, results: [] };
+  function rowHtml(k) {
+    const r = run.results[k];
+    const cls = r == null ? '' : r.pct === null ? 'muted' : r.pct >= 80 ? 'acc-good' : 'acc-bad';
+    const val = r == null ? (k === run.i && run.active ? '…' : '') : r.pct === null ? 'skipped' : r.pct + '%';
+    return `<tr class="${k === run.i && run.active ? 'sel' : ''}" data-k="${k}"><td>${k + 1}</td><td class="s-text">${esc(run.list[k])}</td><td class="${cls}">${val}</td></tr>`;
+  }
+  function renderRun() {
+    $('tTable').querySelector('tbody').innerHTML = run.list.map((_, k) => rowHtml(k)).join('');
+    $('tProgress').textContent = `Sentence ${Math.min(run.i + 1, run.list.length)} of ${run.list.length}`;
+    $('tBar').style.width = Math.round((run.results.filter((x) => x).length / run.list.length) * 100) + '%';
+    $('tPause').textContent = run.paused ? '▶ Resume' : '⏸ Pause';
+  }
+  // waits that a button can cut short
+  function sleep(ms) { return new Promise((res) => { run.wake = () => { clearTimeout(run.wait); run.wake = null; res(); }; run.wait = setTimeout(run.wake, ms); }); }
+  const wake = () => { if (run.wake) run.wake(); };
+
+  $('tStart').addEventListener('click', () => {
+    let list = splitText($('tText').value);
+    if (!list.length) { $('tMsg').textContent = 'Please paste or import a text first.'; return; }
+    if (!SR && !canRecord) { $('tMsg').textContent = 'Recording is not supported in this browser. Try Chrome or Edge.'; return; }
+    list = list.slice(0, MAX_TEXT_SENTENCES);
+    Object.assign(run, { list, i: 0, active: true, paused: false, stopping: false, results: [] });
+    $('tMsg').textContent = '';
+    $('tSetup').classList.add('hidden'); $('tDone').classList.add('hidden'); $('tRun').classList.remove('hidden');
+    $('voiceSlotText').appendChild($('voiceBox'));
+    fillVoices();
+    loop();
+  });
+  async function loop() {
+    if (run.looping) return;
+    run.looping = true;
+    try { await loopBody(); } finally { run.looping = false; }
+  }
+  async function loopBody() {
+    while (run.active && run.i < run.list.length) {
+      if (run.paused) { renderRun(); $('tStatus').innerHTML = 'Paused. Click <b>Resume</b> to go on.'; return; }
+      const text = run.list[run.i];
+      renderRun();
+      $('tShow').innerHTML = sentenceHtml(text);
+      $('tTune').innerHTML = expectedTune(text).why;
+      $('tResult').innerHTML = '';
+      run.phase = 'try';
+      const t = await shadowOnce(text, '#tShow', (html) => { $('tStatus').innerHTML = html; });
+      if (!run.active) return;
+      if (run.redoNow) { run.redoNow = false; continue; }
+      if (t.fatal) { $('tStatus').innerHTML = ''; $('tResult').innerHTML = `<p class="feedback wrong">${esc(t.fatal)}</p>`; run.paused = true; renderRun(); return; }
+      if (t.skipped) { run.results[run.i] = { pct: null }; $('tStatus').textContent = 'Skipped.'; }
+      else {
+        let s = $('tSave').checked ? findSentence(text) : null;
+        if ($('tSave').checked && !s) { s = { id: uid(), text: /[.!?,;:]$/.test(text) ? text : text + '.', added: todayKey(), tries: 0, best: 0, last: null }; db.sentences.push(s); day().newWords++; }
+        const res = await scoreTry(s || { text }, t.heard, t.a, !!SR);
+        run.results[run.i] = { pct: res.pct, audio: t.audio };
+        $('tResult').innerHTML = res.html;
+        $('tStatus').textContent = '';
+      }
+      run.i++;
+      renderRun();
+      if (run.i >= run.list.length || !run.active) break;
+      // short break to read the result, then the next sentence starts by itself
+      run.phase = 'wait';
+      $('tProgress').textContent = `Sentence ${run.i} of ${run.list.length} done`;
+      const secs = +$('tGap').value;
+      for (let k = secs; k > 0 && run.active && !run.paused && !run.redo; k--) { $('tStatus').innerHTML = `Next sentence in <b>${k}</b>…`; await sleep(1000); }
+      run.redo = false;
+    }
+    if (run.active) finishRun();
+  }
+  // One try at a sentence: read it, record the learner, analyse. Shared by the text mode.
+  async function shadowOnce(text, box, status) {
+    const along = $('alongBox').checked;
+    const est = Math.max(2, wordsOf(text).length * 0.45 * ($('slowBox').checked ? 1.4 : 1));
+    let r;
+    if (along) {
+      status('🗣️ <b>Speak along</b> with the voice now.');
+      const p = listenOnce(est * 2 + 6);
+      await speak(text, box);
+      setTimeout(() => { if (mic) mic.stop(); }, 1500);
+      r = await p;
+    } else {
+      status('👂 Listen…');
+      const modelSec = await speak(text, box);
+      if (!run.active || run.skipNow || run.redoNow) { run.skipNow = false; return { skipped: true }; }
+      status('🎙️ <b>Your turn:</b> say it now, the same way.');
+      r = await listenOnce(Math.max(modelSec, est) * 2 + 4);
+    }
+    if (run.skipNow || run.redoNow) { run.skipNow = false; return { skipped: true }; }
+    if (r.error === 'not-allowed' || r.error === 'service-not-allowed' || r.error === 'audio-capture') return { fatal: micMessage(r.error) };
+    if (!r.heard && !r.audio) return { skipped: true };
+    status('Checking…');
+    let a = null;
+    if (r.audio) { try { a = await analyse(r.audio); } catch (e) { console.warn('Analysis failed', e); } }
+    if (!r.heard && a && a.quiet) return { skipped: true };
+    return { heard: r.heard, a, audio: r.audio };
+  }
+  $('tPause').addEventListener('click', () => {
+    if (!run.active) return;
+    run.paused = !run.paused;
+    renderRun();
+    if (!run.paused) loop();
+    else if (run.phase === 'wait') wake();
+    else $('tStatus').innerHTML = 'Pausing after this sentence…';
+  });
+  $('tAgain').addEventListener('click', () => {
+    if (!run.active) return;
+    if (run.phase === 'wait' || run.paused) {
+      // repeat the sentence that was just scored
+      if (run.i > 0) { run.i--; run.results[run.i] = null; }
+      run.redo = true; wake();
+      if (run.paused) { run.paused = false; loop(); }
+    } else {
+      // start the current sentence again
+      run.redoNow = true;
+      if (canSpeak) speechSynthesis.cancel();
+      if (mic) mic.stop();
+    }
+  });
+  $('tSkip').addEventListener('click', () => {
+    if (!run.active) return;
+    if (run.phase === 'wait') { wake(); return; }
+    run.skipNow = true;
+    if (canSpeak) speechSynthesis.cancel();
+    if (mic) mic.stop();
+  });
+  $('tStop').addEventListener('click', () => {
+    run.active = false;
+    wake();
+    if (canSpeak) speechSynthesis.cancel();
+    if (mic) mic.stop();
+    finishRun();
+  });
+  $('tTable').addEventListener('click', (e) => {
+    const tr = e.target.closest('tr[data-k]');
+    const r = tr && run.results[+tr.dataset.k];
+    if (r && r.audio) { if (audioEl) audioEl.pause(); audioEl = new Audio(r.audio); audioEl.play().catch(() => {}); }
+  });
+  function finishRun() {
+    run.active = false;
+    flushCloud();
+    $('tRun').classList.add('hidden'); $('tDone').classList.remove('hidden');
+    const done = run.results.map((r, k) => ({ r, k })).filter((x) => x.r && x.r.pct !== null);
+    const avg = done.length ? Math.round(done.reduce((p, x) => p + x.r.pct, 0) / done.length) : null;
+    const weak = done.filter((x) => x.r.pct < 80);
+    $('tSummary').innerHTML = `
+      <div class="big-num">${avg === null ? '–' : avg + '%'}</div>
+      <div class="line">Average match over ${done.length} sentence${done.length === 1 ? '' : 's'}${run.list.length > done.length ? ` (of ${run.list.length})` : ''}.</div>
+      <div class="line">${done.filter((x) => x.r.pct >= 80).length} sentence(s) at 80% or more · today's shadowing score: <b>${(db.days[todayKey()] || {}).score || 0}</b> points.</div>
+      <div class="table-wrap" style="margin-top:12px"><table class="click-rows"><thead><tr><th>#</th><th>Sentence</th><th>Match</th></tr></thead>
+      <tbody>${run.list.map((t, k) => { const r = run.results[k]; return `<tr data-k="${k}"><td>${k + 1}</td><td class="s-text">${esc(t)}</td><td class="${!r || r.pct === null ? 'muted' : r.pct >= 80 ? 'acc-good' : 'acc-bad'}">${!r ? '–' : r.pct === null ? 'skipped' : r.pct + '%'}</td></tr>`; }).join('')}</tbody></table></div>
+      <p class="hint">Click a row to hear your voice for that sentence.</p>`;
+    $('tSummary').querySelector('tbody').onclick = (e) => { const tr = e.target.closest('tr[data-k]'); const r = tr && run.results[+tr.dataset.k]; if (r && r.audio) { if (audioEl) audioEl.pause(); audioEl = new Audio(r.audio); audioEl.play().catch(() => {}); } };
+    $('tWeak').classList.toggle('hidden', !weak.length);
+    $('tWeak').textContent = `Practise the ${weak.length} sentence${weak.length === 1 ? '' : 's'} under 80% again`;
+    $('tWeak').onclick = () => {
+      Object.assign(run, { list: weak.map((x) => run.list[x.k]), i: 0, active: true, paused: false, stopping: false, results: [] });
+      $('tDone').classList.add('hidden'); $('tRun').classList.remove('hidden');
+      loop();
+    };
+  }
+  $('tNew').addEventListener('click', () => { $('tDone').classList.add('hidden'); $('tSetup').classList.remove('hidden'); });
+  window.__peweShadowTest.splitText = splitText;
 
   // ---------- my sentences ----------
   function showTab(name) {
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
     document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
     if (name === 'list') renderList();
+    if (name === 'text') updateTextCount();
   }
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
   function renderList() {

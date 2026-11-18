@@ -447,3 +447,5 @@ code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: .
 .contour .c-head { fill: var(--bad); }
 .contour .c-head.ok { fill: var(--good); }
 .s-text { font-weight: 500; }
+#tText { display: block; width: 100%; padding: 12px 14px; font: inherit; resize: vertical; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); }
+#tTable td:first-child { color: var(--muted); width: 2.5em; }

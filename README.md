@@ -105,6 +105,10 @@ Signed-in students' pronunciation data is saved in the `pron` field of their `us
 - The page checks the words (Chrome/Edge speech recognition; same-sounding words count as right), the melody at the
   end (pitch from the recording), how lively the voice is, and the speed. It shows a match score, the words heard,
   a melody chart and tips. 80% or more = 10 points.
+- **Shadow a text** – paste a text or import a .txt file. It is split into sentences (long ones are cut at commas;
+  those parts should keep the voice up). The page then goes through them by itself: reads a sentence, records the
+  learner, scores it, short break (2/4/7 s), next sentence. Pause, Repeat sentence, Skip, Stop. At the end: average,
+  score per sentence (click to hear your voice), and "practise the sentences under 80% again". Up to 60 sentences.
 - **My sentences** – best and last score per sentence; "Practise my sentences" starts with the weakest.
 - Signed-in students' data is saved in the `shad` field of their `users/{uid}` document.
 

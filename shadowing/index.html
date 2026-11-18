@@ -6,8 +6,8 @@
   <title>Shadowing Practice</title>
   <meta name="description" content="Sentence shadowing with American intonation — Practice English with Ehsan Platform">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../style.css?v=20261117d">
-  <script src="../site.js?v=20261117d"></script>
+  <link rel="stylesheet" href="../style.css?v=20261118a">
+  <script src="../site.js?v=20261118a"></script>
 </head>
 <body>
   <header class="top">
@@ -22,6 +22,7 @@
 
   <nav class="tabs" role="tablist">
     <button class="tab active" data-tab="practise" role="tab">Shadow a sentence</button>
+    <button class="tab" data-tab="text" role="tab">Shadow a text</button>
     <button class="tab" data-tab="list" role="tab">My sentences</button>
   </nav>
 
@@ -46,6 +47,7 @@
         <div id="sShow" class="s-show" aria-live="off"></div>
         <p id="sTune" class="hint"></p>
 
+        <div id="voiceSlotOne"><div id="voiceBox">
         <div class="voice-row">
           <label class="voice-pick">Voice
             <select id="voiceSel"></select>
@@ -55,6 +57,7 @@
           <label class="check slow-check" title="Use headphones, so the microphone hears only you"><input type="checkbox" id="alongBox"> 🎧 Speak along (headphones)</label>
         </div>
         <p class="hint voice-note" id="voiceNote"></p>
+        </div></div>
 
         <div class="row center"><button id="sGo" class="btn mic-btn big-go" type="button">🔁 Listen, then repeat</button></div>
         <p id="sStatus" class="s-status center" aria-live="polite"></p>
@@ -62,6 +65,66 @@
         <div class="row">
           <button id="sMine" class="btn ghost small hidden" type="button">▶ My voice</button>
           <button id="sNext" class="btn ghost small hidden" type="button">Next sentence ›</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SHADOW A TEXT ============ -->
+    <section id="tab-text" class="panel">
+      <div id="tSetup" class="card">
+        <h2>Shadow a whole text</h2>
+        <p class="hint">Paste a text or import a text file. The page splits it into sentences and goes through them on its own:
+          it reads a sentence, you repeat it, you get a score, and the next sentence starts by itself.</p>
+        <textarea id="tText" rows="7" maxlength="12000" placeholder="Paste a short text here, for example a paragraph from a book, an article or a dialogue."></textarea>
+        <div class="row" style="margin-top:8px; align-items:center">
+          <label class="btn ghost file-btn">📄 Import a text file (.txt)
+            <input id="tFile" type="file" accept=".txt,.md,text/plain" hidden>
+          </label>
+          <span id="tCount" class="muted"></span>
+        </div>
+        <div class="row" style="align-items:center">
+          <label class="voice-pick">Break between sentences
+            <select id="tGap">
+              <option value="2">2 seconds</option>
+              <option value="4" selected>4 seconds</option>
+              <option value="7">7 seconds</option>
+            </select>
+          </label>
+          <label class="check slow-check"><input type="checkbox" id="tSave"> Also save the sentences to My sentences</label>
+        </div>
+        <p id="tMsg" class="hint" aria-live="polite"></p>
+        <button id="tStart" class="btn primary" type="button">▶ Start shadowing</button>
+      </div>
+
+      <div id="tRun" class="card hidden">
+        <div class="run-head">
+          <span id="tProgress" class="counter"></span>
+        </div>
+        <div class="progress"><div id="tBar" class="bar"></div></div>
+        <div id="tShow" class="s-show" style="margin-top:12px"></div>
+        <p id="tTune" class="hint"></p>
+        <p id="tStatus" class="s-status" aria-live="polite"></p>
+        <div id="tResult" aria-live="polite"></div>
+        <div class="row">
+          <button id="tPause" class="btn ghost" type="button">⏸ Pause</button>
+          <button id="tAgain" class="btn ghost" type="button">🔁 Repeat sentence</button>
+          <button id="tSkip" class="btn ghost" type="button">⏭ Skip</button>
+          <button id="tStop" class="btn ghost" type="button">⏹ Stop</button>
+        </div>
+        <div id="voiceSlotText" style="margin-top:10px"></div>
+        <h3 class="sub-h">Scores</h3>
+        <div class="table-wrap">
+          <table id="tTable" class="click-rows"><thead><tr><th>#</th><th>Sentence</th><th>Match</th></tr></thead><tbody></tbody></table>
+        </div>
+        <p class="hint">Click a scored row to hear your voice.</p>
+      </div>
+
+      <div id="tDone" class="card hidden">
+        <h2>Text finished</h2>
+        <div id="tSummary" class="summary"></div>
+        <div class="row">
+          <button id="tWeak" class="btn primary" type="button">Practise the weak sentences again</button>
+          <button id="tNew" class="btn ghost" type="button">Shadow another text</button>
         </div>
       </div>
     </section>
@@ -97,7 +160,7 @@
   </main>
 
   <footer class="foot"><a class="home-link" href="../">Practice English with Ehsan Platform</a> · Shadowing Practice</footer>
-  <script src="app.js?v=20261117d"></script>
-  <script type="module" src="../account.js?v=20261117d"></script>
+  <script src="app.js?v=20261118a"></script>
+  <script type="module" src="../account.js?v=20261118a"></script>
 </body>
 </html>
