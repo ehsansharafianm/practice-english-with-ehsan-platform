@@ -56,8 +56,8 @@ function render() {
   const list = students.filter((s) => !q || (s.name || '').toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q));
 
   $('tCount').textContent = `(${students.length})`;
-  const activeToday = students.filter((s) => (s.days || {})[today]?.tries).length;
-  const classWeek = students.reduce((a, s) => { const t = sum(s.days, week); a.tries += t.tries; a.correct += t.correct; a.score += t.score; return a; }, { tries: 0, correct: 0, score: 0 });
+  const activeToday = students.filter((s) => (s.days || {})[today]?.tries || ((s.pron || {}).days || {})[today]?.tries).length;
+  const classWeek = students.reduce((a, s) => { const t = sum({ ...s.days }, week); const p = sum((s.pron || {}).days, week); t.tries += p.tries; t.correct += p.correct; t.score += p.score; a.tries += t.tries; a.correct += t.correct; a.score += t.score; return a; }, { tries: 0, correct: 0, score: 0 });
   $('tClass').innerHTML = `
     <div class="stat"><div class="stat-val">${students.length}</div><div class="stat-lbl">Students</div></div>
     <div class="stat"><div class="stat-val">${activeToday}</div><div class="stat-lbl">Practised today</div></div>
@@ -69,6 +69,7 @@ function render() {
     const w = sum(s.days, week);
     const all = sum(s.days);
     const acc = pct(all.correct, all.tries);
+    const pw = sum((s.pron || {}).days, week);
     return `<tr data-id="${esc(s.id)}" class="${s.id === openId ? 'sel' : ''}" tabindex="0">
       <td><div class="w">${esc(s.name || 'Student')}</div><div class="n">${esc(s.email)}</div></td>
       <td>${esc(ago(s.lastActive))}</td>
@@ -76,8 +77,9 @@ function render() {
       <td>${w.score} pts</td>
       <td class="${all.tries ? (acc >= 80 ? 'acc-good' : 'acc-bad') : ''}">${all.tries ? acc + '%' : '–'}</td>
       <td>${(s.words || []).length}</td>
+      <td>${pw.score} pts · ${((s.pron || {}).words || []).length} words</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="6" class="muted">No students yet. Share the website link; students appear here after they sign in.</td></tr>';
+  }).join('') : '<tr><td colspan="7" class="muted">No students yet. Share the website link; students appear here after they sign in.</td></tr>';
 }
 
 function showStudent(id) {
@@ -88,20 +90,24 @@ function showStudent(id) {
   const days = lastDays(14);
   const words = [...(s.words || [])].sort((a, b) => pct(a.correct, a.tries) - pct(b.correct, b.tries) || (b.tries || 0) - (a.tries || 0));
   const all = sum(s.days);
+  const pacc = (w) => { const t = (w.sayTries || 0) + (w.stressTries || 0); return t ? ((w.sayOk || 0) + (w.stressOk || 0)) / t : 2; };
+  const pron = [...((s.pron || {}).words || [])].sort((a, b) => pacc(a) - pacc(b));
+  const pAll = sum((s.pron || {}).days);
   const el = $('tDetail');
   el.innerHTML = `
     <div class="lib-head">
       <h2>${esc(s.name || 'Student')} <span class="muted">${esc(s.email)}</span></h2>
       <button class="btn ghost small" type="button" id="tClose">Close</button>
     </div>
-    <p class="hint">Total: ${all.score} points · ${all.tries} tries · ${all.tries ? pct(all.correct, all.tries) + '% accuracy' : 'no practice yet'} · ${words.length} words</p>
+    <p class="hint">Total: ${all.score} points · ${all.tries} tries · ${all.tries ? pct(all.correct, all.tries) + '% accuracy' : 'no practice yet'} · ${words.length} words · Pronunciation: ${pAll.score} points, ${pAll.tries ? pct(pAll.correct, pAll.tries) + '% right' : 'no practice yet'}</p>
     <h3 class="sub-h">Last 14 days</h3>
     <div class="table-wrap"><table>
-      <thead><tr><th>Day</th><th>Score</th><th>Tries</th><th>Accuracy</th><th>New words</th></tr></thead>
+      <thead><tr><th>Day</th><th>Score</th><th>Tries</th><th>Accuracy</th><th>New words</th><th>Pronunciation</th></tr></thead>
       <tbody>${days.map((k) => {
         const d = (s.days || {})[k] || {};
         const label = new Date(k + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-        return `<tr class="${d.tries ? '' : 'dim'}"><td>${label}</td><td>${d.score || 0}</td><td>${d.tries || 0}</td><td>${d.tries ? pct(d.correct, d.tries) + '%' : '–'}</td><td>${d.newWords || 0}</td></tr>`;
+        const pd = (((s.pron || {}).days || {})[k] || {});
+        return `<tr class="${d.tries || pd.tries ? '' : 'dim'}"><td>${label}</td><td>${d.score || 0}</td><td>${d.tries || 0}</td><td>${d.tries ? pct(d.correct, d.tries) + '%' : '–'}</td><td>${d.newWords || 0}</td><td>${(((s.pron || {}).days || {})[k] || {}).score || 0} pts</td></tr>`;
       }).join('')}</tbody>
     </table></div>
     <h3 class="sub-h">Words (weakest first)</h3>
@@ -111,7 +117,14 @@ function showStudent(id) {
         const a = pct(w.correct, w.tries);
         return `<tr><td><div class="w">${esc(w.text)}</div>${w.note ? `<div class="n">${esc(w.note)}</div>` : ''}</td>
           <td class="${w.tries ? (a >= 80 ? 'acc-good' : 'acc-bad') : ''}">${w.tries ? a + '%' : '–'}</td><td>${w.tries || 0}</td><td>${esc(w.added || '')}</td></tr>`;
-      }).join('')}</tbody></table></div>` : '<p class="muted">No words yet.</p>'}`;
+      }).join('')}</tbody></table></div>` : '<p class="muted">No words yet.</p>'}
+    <h3 class="sub-h">Pronunciation words (weakest first)</h3>
+    ${pron.length ? `<div class="table-wrap"><table>
+      <thead><tr><th>Word</th><th>Saying</th><th>Stress</th><th>Added</th></tr></thead>
+      <tbody>${pron.map((w) => {
+        const cell = (ok, t) => (t ? `<td class="${pct(ok, t) >= 80 ? 'acc-good' : 'acc-bad'}">${pct(ok, t)}% <span class="muted">(${t})</span></td>` : '<td>–</td>');
+        return `<tr><td><div class="w">${esc(w.text)}</div></td>${cell(w.sayOk, w.sayTries)}${cell(w.stressOk, w.stressTries)}<td>${esc(w.added || '')}</td></tr>`;
+      }).join('')}</tbody></table></div>` : '<p class="muted">No pronunciation words yet.</p>'}`;
   el.classList.remove('hidden');
   $('tClose').onclick = () => { openId = null; el.classList.add('hidden'); render(); };
 }

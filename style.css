@@ -351,3 +351,45 @@ code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: .
   .acct-name { display: none; }
   .acct-btn.me { padding: 4px; }
 }
+
+/* ---------- Pronunciation Practice ---------- */
+.pr-word { font-size: 2.2rem; font-weight: 800; letter-spacing: .01em; line-height: 1.2; overflow-wrap: anywhere; }
+.ipa { font: 1.35rem/1.4 "Charis SIL", "Doulos SIL", "Gentium Plus", "Segoe UI", "Lucida Sans Unicode", "Arial Unicode MS", serif; color: var(--accent); margin: 4px 0 6px; overflow-wrap: anywhere; }
+.ipa-sm { font-family: "Charis SIL", "Doulos SIL", "Segoe UI", "Lucida Sans Unicode", serif; color: var(--accent); }
+.ipa-cell { font-family: "Charis SIL", "Doulos SIL", "Segoe UI", "Lucida Sans Unicode", serif; white-space: nowrap; }
+.flag { display: inline-block; font: 700 .7rem/1 system-ui, sans-serif; letter-spacing: .06em; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; vertical-align: middle; }
+.center { text-align: center; justify-content: center; }
+.syls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px; margin: 12px 0 6px; }
+.syls.center { justify-content: center; }
+.syl { display: inline-flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px;
+  min-width: 46px; padding: 8px 10px 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
+.syl b { font-size: 1.05rem; font-weight: 600; }
+.syl small { font-family: "Charis SIL", "Doulos SIL", "Segoe UI", "Lucida Sans Unicode", serif; color: var(--muted); font-size: .85rem; }
+.syl.s1 { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); padding: 12px 14px 8px; position: relative; }
+.syl.s1 b { font-size: 1.5rem; font-weight: 800; }
+.syl.s1 small { color: inherit; opacity: .85; }
+.syl.s1::before { content: "●"; position: absolute; top: -14px; font-size: .8rem; color: var(--accent); }
+.syl.s2 { border-color: var(--accent); border-width: 2px; }
+.syl.s2 b { font-weight: 700; font-size: 1.15rem; }
+.syl-dot { color: var(--muted); align-self: center; }
+.syl-gap { width: 18px; }
+.syls.small .syl { min-width: 0; padding: 4px 7px; }
+.syls.small .syl b { font-size: .9rem; }
+.syls.small .syl.s1 b { font-size: 1.05rem; }
+.syls.small .syl.s1::before { display: none; }
+.alt-pron { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0; font-size: .95rem; }
+.alt-pron .syls { margin: 0; }
+.stress-key { background: var(--accent); color: var(--accent-ink); font-weight: 800; padding: 0 6px; border-radius: 6px; }
+.voice-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 14px 0 4px; }
+.slow-check { margin: 0 0 0 4px; }
+.voice-note { font-size: .85rem; }
+.meaning { margin: 10px 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 8px; }
+.meaning .muted { margin-top: 4px; font-style: italic; }
+.mic-btn { background: var(--good); color: #fff; border-color: transparent; font-weight: 700; padding: 12px 22px; }
+.mic-btn.on { background: var(--bad); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 8px rgba(214, 57, 57, .18); } }
+.mic-result .row { margin-top: 6px; }
+.mic-result .feedback { margin: 10px 0 4px; }
+.syls.pick .syl { cursor: pointer; }
+.syls.pick .syl:hover { border-color: var(--accent); transform: translateY(-2px); }
+.saved-note { color: var(--good); }

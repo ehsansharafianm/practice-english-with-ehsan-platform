@@ -1,6 +1,6 @@
 // Student accounts (Firebase Auth + Firestore).
 // Adds a "Sign in" button to the top bar, a sign-in dialog, and window.PEWE for the pages:
-//   PEWE.enabled, PEWE.user, PEWE.isTeacher, PEWE.load(), PEWE.save(db), PEWE.listStudents()
+//   PEWE.enabled, PEWE.user, PEWE.isTeacher, PEWE.load(), PEWE.save(db), PEWE.savePron(p), PEWE.listStudents()
 // Pages listen for the "pewe-auth" event, fired whenever someone signs in or out.
 import { firebaseConfig } from './firebase-config.js';
 
@@ -57,6 +57,12 @@ async function start() {
       words: clean.words,
       days: clean.days
     }, { merge: true });
+  };
+  // Pronunciation Practice keeps its own words and daily scores in the "pron" field.
+  api.savePron = async (p) => {
+    if (!api.user) return;
+    const clean = JSON.parse(JSON.stringify({ words: p.words || [], days: p.days || {} }));
+    await F.setDoc(userDoc(), { name: displayName(), email: api.user.email || '', lastActive: F.serverTimestamp(), pron: clean }, { merge: true });
   };
   api.listStudents = async () => {
     const snap = await F.getDocs(F.collection(fs, 'users'));

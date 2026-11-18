@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pronunciation Practice</title>
+  <meta name="description" content="American English pronunciation: phonetics, stress, voices and speaking practice — Practice English with Ehsan Platform">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css">
+  <script src="../site.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Pronunciation Practice</h1>
+    </div>
+    <div class="today-chip" title="Today's pronunciation score">
+      <span class="chip-label">Today</span>
+      <span id="chipScore">0</span><span class="chip-unit">pts</span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="word" role="tab">New word</button>
+    <button class="tab" data-tab="practice" role="tab">Practice</button>
+    <button class="tab" data-tab="words" role="tab">My words</button>
+  </nav>
+
+  <main>
+    <!-- ============ NEW WORD ============ -->
+    <section id="tab-word" class="panel active">
+      <div class="card">
+        <h2>Look up a word</h2>
+        <p class="hint">Type a word to see its American pronunciation: phonetics, syllables and stress. Listen to a woman's and a man's voice, then record yourself.</p>
+        <form id="wordForm" class="row" autocomplete="off" style="margin-top:4px">
+          <input id="wordInput" type="text" required maxlength="60" placeholder="e.g. pronunciation"
+                 autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1; min-width:180px">
+          <button class="btn primary" type="submit">Show</button>
+        </form>
+      </div>
+
+      <div id="detail" class="card hidden" aria-live="polite"></div>
+    </section>
+
+    <!-- ============ PRACTICE ============ -->
+    <section id="tab-practice" class="panel">
+      <div id="prSetup" class="card">
+        <h2>Practise your words</h2>
+        <div id="prEmpty" class="empty hidden">No words yet. Look up a word first, or add words in Dictation.</div>
+        <form id="prForm">
+          <label>What to practise
+            <select id="prMode">
+              <option value="say">Say the word (microphone)</option>
+              <option value="stress">Find the stress</option>
+            </select>
+          </label>
+          <label>Words from
+            <select id="prSource">
+              <option value="pron">My pronunciation words</option>
+              <option value="dict">My dictation words</option>
+              <option value="both">Both</option>
+            </select>
+          </label>
+          <label>How many words
+            <select id="prCount">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+              <option value="all">All words</option>
+            </select>
+          </label>
+          <p id="prModeHint" class="hint"></p>
+          <button class="btn primary" type="submit">Start practice</button>
+        </form>
+      </div>
+
+      <div id="prRun" class="card hidden">
+        <div class="run-head">
+          <span id="prCounter" class="counter">Word 1 of 10</span>
+          <span class="row" style="margin:0">
+            <button class="btn ghost small" type="button" data-say="female">👩 Woman</button>
+            <button class="btn ghost small" type="button" data-say="male">👨 Man</button>
+          </span>
+        </div>
+        <div id="prBody"></div>
+        <div id="prFeedback" class="feedback" aria-live="polite"></div>
+        <div class="progress"><div id="prBar" class="bar"></div></div>
+        <div class="row">
+          <button id="prNext" class="btn primary hidden" type="button">Next word</button>
+          <button id="prSkip" class="btn ghost" type="button">Skip</button>
+          <button id="prQuit" class="btn ghost" type="button">Stop</button>
+        </div>
+      </div>
+
+      <div id="prDone" class="card hidden">
+        <h2>Practice finished</h2>
+        <div id="prSummary" class="summary"></div>
+        <div class="row">
+          <button id="prAgain" class="btn primary" type="button">Practise again</button>
+          <button class="btn ghost" type="button" data-goto="words">See my words</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MY WORDS ============ -->
+    <section id="tab-words" class="panel">
+      <div class="card">
+        <div class="lib-head">
+          <h2>My words <span id="wCount" class="muted"></span></h2>
+          <input id="wSearch" type="search" placeholder="Search…">
+        </div>
+        <div id="wEmpty" class="empty hidden">No words yet. Look up a word in "New word".</div>
+        <div class="table-wrap">
+          <table id="wTable" class="click-rows">
+            <thead><tr><th>Word</th><th>Phonetics (US)</th><th>Saying</th><th>Stress</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="hint">Click a word to see its details again. "Saying" and "Stress" show how often you got it right in practice.</p>
+      </div>
+      <div class="card">
+        <h2>Today</h2>
+        <div class="stats">
+          <div class="stat"><div class="stat-val" id="tScore">0</div><div class="stat-lbl">Score</div></div>
+          <div class="stat"><div class="stat-val" id="tAcc">–</div><div class="stat-lbl">Accuracy</div></div>
+          <div class="stat"><div class="stat-val" id="tTries">0</div><div class="stat-lbl">Tries</div></div>
+          <div class="stat"><div class="stat-val" id="tNew">0</div><div class="stat-lbl">New words</div></div>
+        </div>
+        <p class="hint">Each correct answer = 10 points.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot"><a class="home-link" href="../">Practice English with Ehsan Platform</a> · Pronunciation Practice · US pronunciations from the CMU Pronouncing Dictionary</footer>
+  <script src="app.js"></script>
+  <script type="module" src="../account.js"></script>
+</body>
+</html>

@@ -19,6 +19,11 @@ dictation/        Dictation Practice
   index.html
   app.js
   words.txt       English word list for the spell check
+pronunciation/    Pronunciation Practice
+  index.html
+  app.js
+  data/*.txt      American pronunciations (syllables + stress), one file per first letter
+tools/build_pron.py  Builds pronunciation/data from the CMU Pronouncing Dictionary
 ```
 
 Each new practice tool gets its own folder, a card on the home page, and an entry in the `PAGES` list in `site.js`.
@@ -57,13 +62,30 @@ Setup (once):
 4. Sign in on the site once, then in Firestore create a collection `teachers` with a document whose ID is
    your user ID (shown on the teacher page). That account can now open the dashboard.
 
-Each student is one document `users/{uid}` with `name`, `email`, `words`, `days`, `createdAt`, `lastActive`.
+Each student is one document `users/{uid}` with `name`, `email`, `words`, `days`, `createdAt`, `lastActive`,
+and `pron` (Pronunciation Practice words and days).
 
 ### Word list
 
 `dictation/words.txt` is the SCOWL-based English list from the `word-list` package, plus common contractions,
 days, months, countries and a few common names. Words are ordered from most to least common
 (using `wordfreq`), so the most likely suggestions come first.
+
+## Pronunciation Practice
+
+- **New word** – type a word to see its American pronunciation: IPA phonetics, the syllables, and which syllable
+  is stressed (the big coloured one; secondary stress has a coloured border). Each syllable also has a simple
+  "sounds like" spelling (e.g. pruh · nun · see · AY · shuhn). Listen with a woman's or a man's US voice (normal or
+  slow), or a real recording when the online dictionary has one. Then click **Say it**: the browser checks what you
+  said (Chrome/Edge) and you can play back your own voice to compare. Looked-up words are saved to **My words**.
+- **Practice** – "Say the word" (3 tries per word) or "Find the stress" (click the stressed syllable),
+  with words from My words, from Dictation, or both. Weaker words come first. 10 points per correct answer.
+- **My words** – all words with phonetics and how often you got them right, plus today's totals.
+
+Pronunciations come from the CMU Pronouncing Dictionary (BSD licence), split into syllables by `tools/build_pron.py`
+(`python tools/build_pron.py cmudict.dict pronunciation/data`). Meanings and real recordings come from the free
+dictionaryapi.dev. Voices are the device's own; Microsoft Edge has the most natural ones.
+Signed-in students' pronunciation data is saved in the `pron` field of their `users/{uid}` document.
 
 ## Run locally
 

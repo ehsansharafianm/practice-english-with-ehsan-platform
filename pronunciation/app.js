@@ -1,0 +1,604 @@
+/* Pronunciation Practice — Practice English with Ehsan Platform
+ * American pronunciations (phonetics, syllables, stress) come from the CMU Pronouncing Dictionary,
+ * split by first letter in data/*.txt. Format: word<TAB>syllables;variant  (syllables split by ".",
+ * phones in ARPAbet, vowel digit = stress: 1 main, 2 secondary, 0 none).
+ * Meanings and real recordings come from the free dictionaryapi.dev, when it has the word.
+ * Guests: saved in this browser. Signed-in students: also saved to their account (../account.js).
+ */
+(() => {
+  'use strict';
+
+  const POINTS = 10;
+  const SAY_TRIES = 3;                      // attempts per word in "Say the word"
+  const STORE_KEY = 'pronunciation-v1';
+  const DICT_KEY = 'dictation-practice-v1'; // Dictation's own saved words (read only)
+  let storeKey = STORE_KEY;
+  let cloudOK = false;
+  let cloudDictWords = [];
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const norm = (s) => String(s || '').replace(/[‘’]/g, "'").toLowerCase().replace(/[^a-z' -]/g, ' ').replace(/\s+/g, ' ').trim();
+  const pct = (c, t) => (t ? Math.round((c / t) * 100) : 0);
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const ordinal = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
+
+  // ---------- storage ----------
+  function load(key = storeKey) {
+    try { const d = JSON.parse(localStorage.getItem(key) || 'null'); if (d) return { words: d.words || [], days: d.days || {} }; } catch (e) { /* ignore */ }
+    return { words: [], days: {} };
+  }
+  let db = load();
+  let cloudTimer = null;
+  function save() {
+    try { localStorage.setItem(storeKey, JSON.stringify(db)); } catch (e) { /* ignore */ }
+    if (window.PEWE && window.PEWE.user && cloudOK) { clearTimeout(cloudTimer); cloudTimer = setTimeout(flushCloud, 1500); }
+  }
+  function flushCloud() {
+    clearTimeout(cloudTimer); cloudTimer = null;
+    if (window.PEWE && window.PEWE.user && cloudOK && window.PEWE.savePron) window.PEWE.savePron(db).catch((e) => console.warn('Cloud save failed', e));
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudTimer) flushCloud(); });
+
+  const STAT_FIELDS = ['sayTries', 'sayOk', 'stressTries', 'stressOk'];
+  function merge(a, b) {
+    const out = { words: (a.words || []).map((w) => ({ ...w })), days: JSON.parse(JSON.stringify(a.days || {})) };
+    (b.words || []).forEach((w) => {
+      const x = out.words.find((y) => norm(y.text) === norm(w.text));
+      if (!x) out.words.push({ ...w });
+      else STAT_FIELDS.forEach((f) => { x[f] = Math.max(x[f] || 0, w[f] || 0); });
+    });
+    Object.entries(b.days || {}).forEach(([k, v]) => {
+      const d = out.days[k] || (out.days[k] = {});
+      ['tries', 'correct', 'score', 'newWords'].forEach((f) => { d[f] = Math.max(d[f] || 0, v[f] || 0); });
+    });
+    return out;
+  }
+
+  document.addEventListener('pewe-auth', async (e) => {
+    const user = e.detail.user;
+    clearTimeout(cloudTimer);
+    cloudOK = false; cloudDictWords = [];
+    if (user) {
+      storeKey = STORE_KEY + ':' + user.uid;
+      let cloud = null;
+      try { cloud = await window.PEWE.load(); cloudOK = true; } catch (err) { console.warn('Could not load account data', err); }
+      cloudDictWords = (cloud && cloud.words) || [];
+      db = merge(merge((cloud && cloud.pron) || { words: [], days: {} }, load(storeKey)), load(STORE_KEY));
+      try { localStorage.removeItem(STORE_KEY); } catch (err) { /* ignore */ }
+      save();
+      if (cloudOK) flushCloud();
+    } else {
+      storeKey = STORE_KEY;
+      db = load(storeKey);
+    }
+    refresh();
+  });
+
+  function day() {
+    const k = todayKey();
+    return db.days[k] || (db.days[k] = { tries: 0, correct: 0, score: 0, newWords: 0 });
+  }
+  function record(word, kind, ok) {
+    const d = day();
+    d.tries++;
+    if (ok) { d.correct++; d.score += POINTS; }
+    if (word) {
+      word[kind + 'Tries'] = (word[kind + 'Tries'] || 0) + 1;
+      if (ok) word[kind + 'Ok'] = (word[kind + 'Ok'] || 0) + 1;
+      word.last = Date.now();
+    }
+    save(); updateChip();
+  }
+  function updateChip() { $('chipScore').textContent = (db.days[todayKey()] || {}).score || 0; }
+  function findWord(text) { return db.words.find((w) => norm(w.text) === norm(text)); }
+
+  // ---------- pronunciation dictionary ----------
+  const shards = {};
+  function shard(ch) {
+    const k = ch >= 'a' && ch <= 'z' ? ch : '0';
+    if (!shards[k]) {
+      shards[k] = fetch('data/' + k + '.txt').then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); }).then((t) => {
+        const m = new Map();
+        t.split('\n').forEach((line) => { const i = line.indexOf('\t'); if (i > 0) m.set(line.slice(0, i), line.slice(i + 1).split(';')); });
+        return m;
+      }).catch((e) => { delete shards[k]; throw e; });
+    }
+    return shards[k];
+  }
+  // -> array of variants; each variant = array of syllables {phones:[...], stress:0|1|2}
+  async function prons(word) {
+    const w = norm(word);
+    if (!w) return [];
+    const m = await shard(w[0]);
+    const raw = m.get(w) || m.get(w.replace(/'/g, '')) || [];
+    return raw.map((v) => v.split('.').map((s) => {
+      const phones = s.split(' ');
+      const vow = phones.find((p) => /\d$/.test(p)) || '';
+      return { phones, stress: vow ? +vow.slice(-1) : 0 };
+    }));
+  }
+
+  const IPA = { AA: 'ɑ', AE: 'æ', AO: 'ɔ', AW: 'aʊ', AY: 'aɪ', EH: 'ɛ', EY: 'eɪ', IH: 'ɪ', IY: 'i', OW: 'oʊ', OY: 'ɔɪ', UH: 'ʊ', UW: 'u',
+    B: 'b', CH: 'tʃ', D: 'd', DH: 'ð', F: 'f', G: 'g', HH: 'h', JH: 'dʒ', K: 'k', L: 'l', M: 'm', N: 'n', NG: 'ŋ', P: 'p', R: 'r',
+    S: 's', SH: 'ʃ', T: 't', TH: 'θ', V: 'v', W: 'w', Y: 'j', Z: 'z', ZH: 'ʒ' };
+  function ipaPhone(p) {
+    const b = p.replace(/\d/, ''), s = p.slice(-1);
+    if (b === 'AH') return s === '0' ? 'ə' : 'ʌ';
+    if (b === 'ER') return s === '0' ? 'ɚ' : 'ɝ';
+    return IPA[b] || '';
+  }
+  const ipaSyl = (syl) => syl.phones.map(ipaPhone).join('');
+  const ipaWord = (sy) => sy.map((s) => (sy.length > 1 && s.stress === 1 ? 'ˈ' : sy.length > 1 && s.stress === 2 ? 'ˌ' : '') + ipaSyl(s)).join('');
+
+  // "Sounds like" spelling for learners, e.g. pruh · nun · see · AY · shuhn
+  const RES = { B: 'b', CH: 'ch', D: 'd', DH: 'dh', F: 'f', G: 'g', HH: 'h', JH: 'j', K: 'k', L: 'l', M: 'm', N: 'n', NG: 'ng', P: 'p',
+    R: 'r', S: 's', SH: 'sh', T: 't', TH: 'th', V: 'v', W: 'w', Y: 'y', Z: 'z', ZH: 'zh' };
+  function respell(syl) {
+    const ph = syl.phones, vi = ph.findIndex((p) => /\d$/.test(p));
+    const onset = vi > 0, coda = vi >= 0 && vi < ph.length - 1;
+    const out = ph.map((p, i) => {
+      if (i !== vi) return RES[p] || '';
+      const b = p.replace(/\d/, '');
+      switch (b) {
+        case 'AA': return 'ah'; case 'AE': return 'a'; case 'AO': return 'aw'; case 'AW': return 'ow';
+        case 'AY': return !onset ? 'eye' : coda ? 'igh' : 'y';
+        case 'EH': return coda ? 'e' : 'eh'; case 'IH': return coda ? 'i' : 'ih';
+        case 'EY': return 'ay'; case 'IY': return 'ee'; case 'OW': return 'oh'; case 'OY': return 'oy';
+        case 'UH': return 'uu'; case 'UW': return 'oo'; case 'ER': return 'ur';
+        case 'AH': return p.endsWith('0') || !coda ? 'uh' : 'u';
+        default: return '';
+      }
+    }).join('');
+    return syl.stress === 1 ? out.toUpperCase() : out;
+  }
+
+  // ---------- online dictionary (meaning + real US recording) ----------
+  const extraCache = {};
+  function extra(word) {
+    const w = norm(word);
+    if (!extraCache[w]) {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 6000);
+      extraCache[w] = fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(w), { signal: ctl.signal })
+        .then((r) => (r.ok ? r.json() : [])).catch(() => []).then((j) => {
+          clearTimeout(t);
+          const out = { audioUS: '', ipa: '', meaning: '', pos: '', example: '' };
+          (Array.isArray(j) ? j : []).forEach((e) => {
+            (e.phonetics || []).forEach((p) => {
+              if (!out.audioUS && p.audio && /-us\.mp3$/i.test(p.audio)) out.audioUS = p.audio;
+              if (!out.ipa && p.text) out.ipa = p.text;
+            });
+            if (!out.meaning && e.meanings && e.meanings[0]) {
+              const m = e.meanings[0], d = (m.definitions || [])[0] || {};
+              out.meaning = d.definition || ''; out.pos = m.partOfSpeech || ''; out.example = d.example || '';
+            }
+          });
+          return out;
+        });
+    }
+    return extraCache[w];
+  }
+
+  // ---------- voices ----------
+  const canSpeak = 'speechSynthesis' in window;
+  const FEMALE = /\b(female|woman|zira|aria|jenny|michelle|ana|emma|ava|allison|samantha|susan|victoria|karen|kimberly|joanna|salli|ivy|kendra|nancy|sara|jane|amber|ashley|cora|elizabeth|monica|libby|sonia|natasha|google us english)\b/i;
+  const MALE = /\b(male|man|david|mark|guy|davis|tony|jason|andrew|brian|eric|christopher|roger|steffan|ryan|thomas|daniel|alex|fred|aaron|tom|ralph|matthew|justin|joey|kevin|jacob|brandon|google uk english male)\b/i;
+  function usVoices() { return canSpeak ? speechSynthesis.getVoices().filter((v) => /^en[-_]US/i.test(v.lang)) : []; }
+  const quality = (v) => (/natural|online|neural/i.test(v.name) ? 3 : 0) + (/google/i.test(v.name) ? 1 : 0);
+  function voiceFor(gender) {
+    const list = usVoices();
+    const isF = (v) => FEMALE.test(v.name) && !/\bmale\b/i.test(v.name);
+    const isM = (v) => MALE.test(v.name) && !isF(v);
+    const match = list.filter(gender === 'female' ? isF : isM).sort((a, b) => quality(b) - quality(a));
+    if (match.length) return { voice: match[0], pitch: 1 };
+    // No voice of that kind on this device: use another US voice with a higher or lower pitch.
+    const any = list.sort((a, b) => quality(b) - quality(a))[0] || null;
+    return { voice: any, pitch: gender === 'female' ? 1.3 : 0.65, fallback: true };
+  }
+  let slow = false;
+  function say(text, gender = 'female') {
+    if (!canSpeak || !text) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = voiceFor(gender);
+    u.lang = 'en-US';
+    if (v.voice) u.voice = v.voice;
+    u.pitch = v.pitch;
+    u.rate = slow ? 0.55 : 0.9;
+    speechSynthesis.speak(u);
+  }
+  function voiceNote() {
+    if (!canSpeak) return 'This browser cannot read words aloud. Try Chrome or Edge.';
+    const f = voiceFor('female'), m = voiceFor('male');
+    if (!f.voice) return 'No American English voice found on this device.';
+    const name = (x) => x.voice.name.replace(/^(Microsoft|Google)\s+/, '').replace(/\s*[-–(].*$/, '');
+    let s = `Voices: woman — ${esc(name(f))}${f.fallback ? ' (pitch raised)' : ''}, man — ${esc(name(m))}${m.fallback ? ' (pitch lowered; this device has no man\'s US voice)' : ''}.`;
+    if (f.fallback || m.fallback) s += ' Microsoft Edge has more natural voices.';
+    return s;
+  }
+  if (canSpeak) speechSynthesis.addEventListener('voiceschanged', () => { const n = document.querySelector('.voice-note'); if (n) n.innerHTML = voiceNote(); });
+  let audioEl = null;
+  function playUrl(url) { if (audioEl) audioEl.pause(); audioEl = new Audio(url); audioEl.play().catch(() => {}); }
+
+  // ---------- microphone: speech recognition + recording ----------
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  let mic = null; // { stop() }
+  // Listens once. Resolves { heard: [alternatives], audio: blobURL|null, error }
+  function listenOnce(onState) {
+    return new Promise(async (resolve) => {
+      let stream = null, rec = null, chunks = [], heard = [], error = '', done = false, recDone = !canRecord;
+      let audio = null;
+      const finish = () => {
+        if (done || !recDone) return;
+        done = true; mic = null; onState('idle');
+        resolve({ heard, audio, error });
+      };
+      const stopAll = () => {
+        try { if (recog) recog.stop(); } catch (e) { /* ignore */ }
+        try { if (rec && rec.state !== 'inactive') rec.stop(); else { recDone = true; finish(); } } catch (e) { recDone = true; finish(); }
+        if (stream) stream.getTracks().forEach((t) => t.stop());
+      };
+      let recog = null;
+      if (canRecord) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          rec = new MediaRecorder(stream);
+          rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+          rec.onstop = () => { if (chunks.length) audio = URL.createObjectURL(new Blob(chunks, { type: rec.mimeType || 'audio/webm' })); recDone = true; if (!recog) finish(); else if (recogEnded) finish(); };
+          rec.start();
+        } catch (e) {
+          recDone = true;
+          return resolve({ heard: [], audio: null, error: 'not-allowed' });
+        }
+      }
+      let recogEnded = !SR;
+      if (SR) {
+        recog = new SR();
+        recog.lang = 'en-US'; recog.maxAlternatives = 5; recog.interimResults = false; recog.continuous = false;
+        recog.onresult = (e) => { heard = Array.from(e.results[0] || []).map((a) => a.transcript); };
+        recog.onerror = (e) => { error = e.error; };
+        recog.onend = () => { recogEnded = true; stopAll(); finish(); };
+        try { recog.start(); } catch (e) { recogEnded = true; }
+      } else {
+        setTimeout(stopAll, 3500); // recording only: 3.5 seconds
+      }
+      mic = { stop: stopAll };
+      onState('listening');
+    });
+  }
+  // Did the learner say the word? Also accepts words that sound the same ("there" for "their").
+  async function matches(target, heard) {
+    const t = norm(target);
+    const alts = heard.map(norm).filter(Boolean);
+    if (alts.some((a) => a === t || a.replace(/[ -]/g, '') === t.replace(/[ -]/g, ''))) return true;
+    if (t.includes(' ')) return false;
+    try {
+      const flat = (vs) => vs.map((v) => v.map((s) => s.phones.join(' ')).join(' ').replace(/\d/g, ''));
+      const tp = flat(await prons(t));
+      for (const a of alts) {
+        if (a.includes(' ')) continue;
+        const ap = flat(await prons(a));
+        if (ap.some((p) => tp.includes(p))) return true;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  }
+  function micMessage(error) {
+    return {
+      'not-allowed': 'Please allow the microphone for this site (click the lock icon in the address bar), then try again.',
+      'service-not-allowed': 'Please allow the microphone for this site, then try again.',
+      'no-speech': 'I did not hear anything. Click the microphone and say the word clearly.',
+      'audio-capture': 'No microphone found.',
+      network: 'Speech checking needs an internet connection.'
+    }[error] || '';
+  }
+
+  // ---------- word details ----------
+  async function lookup(text) {
+    const tokens = norm(text).split(' ').filter(Boolean).slice(0, 5);
+    const per = await Promise.all(tokens.map((t) => prons(t).catch(() => [])));
+    return tokens.map((t, i) => ({ text: t, variants: per[i] }));
+  }
+  function sylChips(sy, hideStress) {
+    return sy.map((s) => {
+      const cls = hideStress ? 's0' : 's' + s.stress;
+      const r = respell(s);
+      return `<span class="syl ${cls}"><b>${esc(hideStress ? r.toLowerCase() : r)}</b><small>${esc(ipaSyl(s))}</small></span>`;
+    }).join('<span class="syl-dot">·</span>');
+  }
+  function stressSentence(sy) {
+    if (sy.length < 2) return 'One syllable.';
+    const i = sy.findIndex((s) => s.stress === 1);
+    const sec = sy.findIndex((s) => s.stress === 2);
+    let t = `${sy.length} syllables · main stress on the <b>${ordinal(i + 1)}</b> syllable (<b>${esc(respell(sy[i]))}</b>)`;
+    if (sec >= 0) t += ` · weaker stress on the ${ordinal(sec + 1)} (${esc(respell(sy[sec]))})`;
+    return t + '.';
+  }
+
+  let current = null;
+  async function showWord(text, { addToList = true } = {}) {
+    const el = $('detail');
+    const clean = norm(text);
+    if (!clean) return;
+    el.classList.remove('hidden');
+    el.innerHTML = '<p class="muted">Looking up…</p>';
+    let parts;
+    try { parts = await lookup(clean); } catch (e) {
+      el.innerHTML = '<p class="hint">Could not load the pronunciation list. Check your internet connection and try again.</p>'; return;
+    }
+    const known = parts.every((p) => p.variants.length);
+    current = { text: clean, parts };
+    const ex = await extra(clean.split(' ').length === 1 ? clean : clean.split(' ')[0]).catch(() => ({}));
+    const fullIpa = known ? '/' + parts.map((p) => ipaWord(p.variants[0])).join(' ') + '/' : (ex.ipa || '');
+    const alts = parts.length === 1 && parts[0].variants.length > 1
+      ? parts[0].variants.slice(1).map((v) => `<div class="alt-pron"><span class="muted">Also said:</span> <span class="ipa-sm">/${esc(ipaWord(v))}/</span> <span class="syls small">${sylChips(v)}</span></div>`).join('') : '';
+
+    el.innerHTML = `
+      <div class="pr-head">
+        <div>
+          <div class="pr-word">${esc(clean)}</div>
+          <div class="ipa">${fullIpa ? esc(fullIpa) : '<span class="muted">No phonetics found</span>'} <span class="flag">US</span></div>
+        </div>
+      </div>
+      ${known ? `<div class="syls">${parts.map((p) => sylChips(p.variants[0])).join('<span class="syl-gap"></span>')}</div>
+        <p class="hint">${parts.length === 1 ? stressSentence(parts[0].variants[0]) : 'Stress is shown on each word.'}
+        The <span class="stress-key">BIG</span> syllable is stressed: say it louder, longer and a little higher.</p>${alts}`
+        : `<p class="hint">This word is not in the American pronunciation list${ex.ipa ? ', so the phonetics above come from an online dictionary' : ''}. You can still listen to it.</p>`}
+      <div class="voice-row">
+        <button class="btn primary" type="button" data-say="female">👩 Woman (US)</button>
+        <button class="btn primary" type="button" data-say="male">👨 Man (US)</button>
+        ${ex.audioUS ? '<button class="btn ghost" type="button" id="realRec" title="A real person, from an online dictionary">🎧 Real recording</button>' : ''}
+        <label class="check slow-check"><input type="checkbox" id="slowBox" ${slow ? 'checked' : ''}> 🐢 Slow</label>
+      </div>
+      <p class="hint voice-note">${voiceNote()}</p>
+      ${ex.meaning ? `<div class="meaning">${ex.pos ? `<i>${esc(ex.pos)}</i> — ` : ''}${esc(ex.meaning)}${ex.example ? `<div class="muted">“${esc(ex.example)}”</div>` : ''}</div>` : ''}
+      <h3 class="sub-h">Your turn</h3>
+      ${SR || canRecord ? `<p class="hint">${SR ? 'Say the word. I will check it and you can play back your voice to compare.' : 'Record yourself and compare with the voices. (Checking your pronunciation works in Chrome and Edge.)'}</p>
+        <div class="row"><button class="btn mic-btn" type="button" id="dMic">🎙️ Say it</button></div>
+        <div id="dMicResult" class="mic-result" aria-live="polite"></div>` : '<p class="hint">Recording is not supported in this browser. Try Chrome or Edge.</p>'}
+      ${addToList && known ? '<p class="hint saved-note"></p>' : ''}`;
+
+    if (ex.audioUS) $('realRec').onclick = () => playUrl(ex.audioUS);
+    $('slowBox').onchange = (e) => { slow = e.target.checked; };
+    const micBtn = $('dMic');
+    if (micBtn) micBtn.onclick = () => runMic(micBtn, $('dMicResult'), clean, (ok) => { const w = findWord(clean); if (w) record(w, 'say', ok); });
+
+    if (addToList && (known || ex.ipa)) {
+      let w = findWord(clean);
+      const note = el.querySelector('.saved-note');
+      if (!w) {
+        w = { id: uid(), text: clean, added: todayKey(), sayTries: 0, sayOk: 0, stressTries: 0, stressOk: 0 };
+        db.words.push(w); day().newWords++; save(); updateChip();
+        if (note) note.textContent = '✓ Added to My words, so you can practise it later.';
+      } else if (note) note.textContent = '✓ Already in My words.';
+    }
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-say]');
+    if (b) { const t = b.closest('#prRun') ? (pr.queue[pr.i] || {}).text : current && current.text; say(t, b.dataset.say); }
+  });
+
+  // Shared microphone button behaviour. onResult(ok) is called once per attempt.
+  async function runMic(btn, out, target, onResult) {
+    if (mic) { mic.stop(); return; }
+    if (canSpeak) speechSynthesis.cancel();
+    out.innerHTML = '';
+    const r = await listenOnce((state) => {
+      btn.classList.toggle('on', state === 'listening');
+      btn.textContent = state === 'listening' ? (SR ? '👂 Listening… (click to stop)' : '⏺ Recording… (click to stop)') : '🎙️ Say it again';
+    });
+    const play = r.audio ? `<button class="btn ghost small" type="button" data-play="${r.audio}">▶ My voice</button>` : '';
+    const models = '<button class="btn ghost small" type="button" data-say="female">▶ Woman</button><button class="btn ghost small" type="button" data-say="male">▶ Man</button>';
+    if (r.error && !r.heard.length && micMessage(r.error)) { out.innerHTML = `<p class="feedback wrong">${micMessage(r.error)}</p>${play ? `<div class="row">${play}</div>` : ''}`; return null; }
+    if (!SR) { out.innerHTML = `<div class="row">${play}${models}</div><p class="hint">Listen to your voice, then the model. Do they sound the same? Is the stress in the same place?</p>`; return null; }
+    const ok = await matches(target, r.heard);
+    onResult && onResult(ok);
+    const heard = r.heard[0] ? `“${esc(r.heard[0].trim())}”` : 'nothing clear';
+    out.innerHTML = ok
+      ? `<p class="feedback right">✓ Clear! I heard ${heard}.</p><div class="row">${play}${models}</div>`
+      : `<p class="feedback wrong">✗ I heard ${heard}. Listen again, watch the stressed syllable, and try once more.</p><div class="row">${play}${models}</div>`;
+    return ok;
+  }
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-play]'); if (b) playUrl(b.dataset.play); });
+
+  $('wordForm').addEventListener('submit', (e) => { e.preventDefault(); showWord($('wordInput').value); });
+
+  // ---------- tabs ----------
+  function showTab(name) {
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+    document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
+    if (name === 'words') renderWords();
+    if (name === 'practice') renderSetup();
+  }
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
+  document.querySelectorAll('[data-goto]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.goto)));
+  const show = (...ids) => ids.forEach((id) => $(id).classList.remove('hidden'));
+  const hide = (...ids) => ids.forEach((id) => $(id).classList.add('hidden'));
+
+  // ---------- practice ----------
+  function dictationWords() {
+    let local = [];
+    try {
+      const key = window.PEWE && window.PEWE.user ? DICT_KEY + ':' + window.PEWE.user.uid : DICT_KEY;
+      local = (JSON.parse(localStorage.getItem(key) || 'null') || {}).words || [];
+    } catch (e) { /* ignore */ }
+    const seen = new Set(), out = [];
+    [...cloudDictWords, ...local].forEach((w) => { const t = norm(w.text); if (t && !seen.has(t)) { seen.add(t); out.push(t); } });
+    return out;
+  }
+  function sourceWords() {
+    const src = $('prSource').value;
+    const list = [];
+    if (src !== 'dict') db.words.forEach((w) => list.push(w.text));
+    if (src !== 'pron') dictationWords().forEach((t) => { if (!list.some((x) => norm(x) === t)) list.push(t); });
+    return list;
+  }
+  const MODE_HINT = {
+    say: SR ? 'You see the word and say it. I check what you said. You can listen first, and you get 3 tries per word.'
+      : 'Checking your speech works in Chrome and Edge. In this browser you can still record and compare yourself.',
+    stress: 'You see the syllables and click the one with the main stress. Then you hear the word.'
+  };
+  function renderSetup() {
+    const n = sourceWords().length;
+    $('prEmpty').classList.toggle('hidden', n > 0);
+    $('prModeHint').textContent = MODE_HINT[$('prMode').value];
+  }
+  ['prMode', 'prSource'].forEach((id) => $(id).addEventListener('change', renderSetup));
+
+  const pr = { mode: 'say', queue: [], i: 0, right: 0, missed: [], tries: 0, answered: false };
+  function accOf(text, mode) {
+    const w = findWord(text);
+    if (!w) return 0.5;
+    const t = w[mode + 'Tries'] || 0;
+    return t ? (w[mode + 'Ok'] || 0) / t : 0;
+  }
+  $('prForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    pr.mode = $('prMode').value;
+    let words = sourceWords();
+    if (!words.length) { renderSetup(); return; }
+    if (pr.mode === 'stress') {
+      // only words with 2+ syllables that are in the pronunciation list
+      const ok = await Promise.all(words.map(async (t) => { try { const v = await prons(t); return v.length && v[0].length > 1 && !t.includes(' '); } catch (er) { return false; } }));
+      words = words.filter((_, i) => ok[i]);
+      if (!words.length) { $('prModeHint').textContent = 'None of these words has two or more syllables yet. Add longer words, or choose "Say the word".'; return; }
+    }
+    // weaker words first, with some shuffling
+    words = words.map((t) => ({ t, k: accOf(t, pr.mode) + Math.random() * 0.5 })).sort((a, b) => a.k - b.k).map((x) => x.t);
+    const c = $('prCount').value;
+    words = c === 'all' ? words : words.slice(0, +c);
+    pr.queue = words.map((t) => ({ text: t })); pr.i = 0; pr.right = 0; pr.missed = [];
+    hide('prSetup', 'prDone'); show('prRun');
+    step();
+  });
+
+  async function step() {
+    const item = pr.queue[pr.i];
+    pr.tries = 0; pr.answered = false;
+    $('prCounter').textContent = `Word ${pr.i + 1} of ${pr.queue.length}`;
+    $('prBar').style.width = pct(pr.i, pr.queue.length) + '%';
+    $('prFeedback').textContent = ''; $('prFeedback').className = 'feedback';
+    hide('prNext'); show('prSkip');
+    const body = $('prBody');
+    let v = [];
+    try { v = await prons(item.text); } catch (e) { /* ignore */ }
+    item.syl = v[0] || null;
+    if (pr.mode === 'stress') {
+      body.innerHTML = `<div class="target">${esc(item.text)}</div><p class="hint">Which syllable has the main stress?</p>
+        <div class="syls pick">${item.syl.map((s, i) => `<button type="button" class="syl s0" data-i="${i}"><b>${esc(respell(s).toLowerCase())}</b><small>${esc(ipaSyl(s))}</small></button>`).join('<span class="syl-dot">·</span>')}</div>`;
+      body.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => pickStress(+b.dataset.i); });
+    } else {
+      body.innerHTML = `<div class="target">${esc(item.text)}</div>
+        ${item.syl ? `<div class="ipa center">/${esc(ipaWord(item.syl))}/</div><div class="syls center">${sylChips(item.syl)}</div>` : ''}
+        <div class="row center"><button class="btn mic-btn" type="button" id="prMic">🎙️ Say it</button></div>
+        <div id="prMicResult" class="mic-result center" aria-live="polite"></div>`;
+      $('prMic').onclick = () => {
+        if (pr.answered) return;
+        runMic($('prMic'), $('prMicResult'), item.text, (ok) => {
+          pr.tries++;
+          const w = findWord(item.text);
+          record(w, 'say', ok);
+          if (ok) { if (pr.tries === 1) pr.right++; else if (!pr.missed.includes(item.text)) pr.missed.push(item.text); endWord(true); }
+          else if (pr.tries >= SAY_TRIES) { if (!pr.missed.includes(item.text)) pr.missed.push(item.text); endWord(false); }
+          else $('prFeedback').textContent = `Try ${pr.tries + 1} of ${SAY_TRIES}`;
+        });
+      };
+    }
+  }
+  function pickStress(i) {
+    if (pr.answered) return;
+    const item = pr.queue[pr.i];
+    const right = item.syl.findIndex((s) => s.stress === 1);
+    const ok = i === right;
+    record(findWord(item.text), 'stress', ok);
+    if (ok) pr.right++; else pr.missed.push(item.text);
+    const box = $('prBody').querySelector('.syls');
+    box.innerHTML = sylChips(item.syl);
+    box.classList.remove('pick');
+    $('prFeedback').className = 'feedback ' + (ok ? 'right' : 'wrong');
+    $('prFeedback').innerHTML = (ok ? '✓ Correct! ' : '✗ Not this one. ') + stressSentence(item.syl);
+    say(item.text, Math.random() < 0.5 ? 'female' : 'male');
+    endWord(ok, true);
+  }
+  function endWord(ok, keepMsg) {
+    pr.answered = true;
+    if (!keepMsg) {
+      $('prFeedback').className = 'feedback ' + (ok ? 'right' : 'wrong');
+      $('prFeedback').textContent = ok ? '✓ Well done!' : `The word is “${pr.queue[pr.i].text}”. Listen to it a few times and it will come back later.`;
+      if (!ok) say(pr.queue[pr.i].text, 'female');
+    }
+    hide('prSkip'); show('prNext');
+    $('prNext').textContent = pr.i + 1 < pr.queue.length ? 'Next word' : 'See results';
+    $('prNext').focus();
+  }
+  $('prNext').onclick = () => { if (mic) mic.stop(); pr.i++; if (pr.i < pr.queue.length) step(); else finish(); };
+  $('prSkip').onclick = () => { if (mic) mic.stop(); if (!pr.missed.includes(pr.queue[pr.i].text)) pr.missed.push(pr.queue[pr.i].text); pr.i++; if (pr.i < pr.queue.length) step(); else finish(); };
+  $('prQuit').onclick = () => { if (mic) mic.stop(); hide('prRun'); show('prSetup'); renderSetup(); };
+  $('prAgain').onclick = () => { hide('prDone'); show('prSetup'); renderSetup(); };
+  function finish() {
+    flushCloud();
+    $('prBar').style.width = '100%';
+    hide('prRun'); show('prDone');
+    const n = pr.queue.length;
+    $('prSummary').innerHTML = `
+      <div class="big-num">${pct(pr.right, n)}%</div>
+      <div class="line">${pr.right} of ${n} right${pr.mode === 'say' ? ' on the first try' : ''}.</div>
+      <div class="line">Today's pronunciation score: <b>${(db.days[todayKey()] || {}).score || 0}</b> points.</div>
+      ${pr.missed.length ? `<div class="missed">Practise these again: ${pr.missed.map((t) => `<span>${esc(t)}</span>`).join(' ')}</div>` : ''}`;
+  }
+
+  // ---------- my words ----------
+  async function renderWords() {
+    const q = norm($('wSearch').value);
+    const list = db.words.filter((w) => !q || norm(w.text).includes(q)).sort((a, b) => (b.last || 0) - (a.last || 0) || String(b.added).localeCompare(String(a.added)));
+    $('wCount').textContent = `(${db.words.length})`;
+    $('wEmpty').classList.toggle('hidden', db.words.length > 0);
+    const cell = (ok, t) => (t ? `<td class="${pct(ok, t) >= 80 ? 'acc-good' : 'acc-bad'}">${pct(ok, t)}% <span class="muted">(${t})</span></td>` : '<td class="muted">–</td>');
+    const tb = $('wTable').querySelector('tbody');
+    tb.innerHTML = list.map((w) => `<tr data-id="${esc(w.id)}" tabindex="0"><td><div class="w">${esc(w.text)}</div></td><td class="ipa-cell" data-ipa="${esc(w.text)}"></td>
+      ${cell(w.sayOk, w.sayTries)}${cell(w.stressOk, w.stressTries)}<td><button class="del" type="button" data-del="${esc(w.id)}" title="Delete">✕</button></td></tr>`).join('');
+    renderToday();
+    for (const td of tb.querySelectorAll('[data-ipa]')) {
+      const t = td.dataset.ipa;
+      try {
+        const parts = await lookup(t);
+        td.textContent = parts.every((p) => p.variants.length) ? '/' + parts.map((p) => ipaWord(p.variants[0])).join(' ') + '/' : '';
+        if (!td.textContent) extra(t).then((x) => { td.textContent = x.ipa || ''; });
+      } catch (e) { /* ignore */ }
+    }
+  }
+  $('wSearch').addEventListener('input', renderWords);
+  $('wTable').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      const w = db.words.find((x) => x.id === del.dataset.del);
+      if (w && confirm(`Delete “${w.text}” from My words?`)) { db.words = db.words.filter((x) => x !== w); save(); renderWords(); }
+      return;
+    }
+    const tr = e.target.closest('tr[data-id]');
+    if (tr) { const w = db.words.find((x) => x.id === tr.dataset.id); if (w) { showTab('word'); $('wordInput').value = w.text; showWord(w.text); } }
+  });
+  $('wTable').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr[data-id]')) e.target.click(); });
+
+  function renderToday() {
+    const d = db.days[todayKey()] || {};
+    $('tScore').textContent = d.score || 0;
+    $('tAcc').textContent = d.tries ? pct(d.correct, d.tries) + '%' : '–';
+    $('tTries').textContent = d.tries || 0;
+    $('tNew').textContent = d.newWords || 0;
+  }
+
+  function refresh() {
+    updateChip();
+    if ($('tab-words').classList.contains('active')) renderWords();
+    if ($('tab-practice').classList.contains('active')) renderSetup();
+  }
+
+  if (!SR) $('prMode').querySelector('[value=say]').textContent = 'Say the word (record and compare)';
+  if (canSpeak) speechSynthesis.getVoices();
+  refresh();
+  const startWord = new URLSearchParams(location.search).get('w');
+  if (startWord) { $('wordInput').value = startWord; showWord(startWord); }
+})();
