@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shadowing Practice</title>
+  <meta name="description" content="Sentence shadowing with American intonation — Practice English with Ehsan Platform">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css?v=20261117d">
+  <script src="../site.js?v=20261117d"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Shadowing Practice</h1>
+    </div>
+    <div class="today-chip" title="Today's shadowing score">
+      <span class="chip-label">Today</span>
+      <span id="chipScore">0</span><span class="chip-unit">pts</span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="practise" role="tab">Shadow a sentence</button>
+    <button class="tab" data-tab="list" role="tab">My sentences</button>
+  </nav>
+
+  <main>
+    <!-- ============ PRACTISE ============ -->
+    <section id="tab-practise" class="panel active">
+      <div class="card">
+        <h2>Add a sentence</h2>
+        <p class="hint">Type a sentence, or click <b>Say a sentence</b> and say it. Then listen to the American voice and repeat it right after, copying the rhythm and the melody (intonation).</p>
+        <form id="sForm" autocomplete="off">
+          <textarea id="sText" rows="2" maxlength="160" placeholder="e.g. Could you tell me where the station is?"></textarea>
+          <div class="s-count muted"><span id="sCount">0</span> / <span id="sMax">20</span> words</div>
+          <div class="row" style="margin-top:6px">
+            <button id="sAdd" class="btn primary" type="submit">Add sentence</button>
+            <button id="sSay" class="btn mic-btn say-btn" type="button">🎙️ Say a sentence</button>
+          </div>
+          <div id="sMsg" class="spell hidden" aria-live="polite"></div>
+        </form>
+      </div>
+
+      <div id="shadow" class="card hidden">
+        <div id="sShow" class="s-show" aria-live="off"></div>
+        <p id="sTune" class="hint"></p>
+
+        <div class="voice-row">
+          <label class="voice-pick">Voice
+            <select id="voiceSel"></select>
+          </label>
+          <button id="sListen" class="btn ghost" type="button">▶ Listen</button>
+          <label class="check slow-check"><input type="checkbox" id="slowBox"> 🐢 Slow</label>
+          <label class="check slow-check" title="Use headphones, so the microphone hears only you"><input type="checkbox" id="alongBox"> 🎧 Speak along (headphones)</label>
+        </div>
+        <p class="hint voice-note" id="voiceNote"></p>
+
+        <div class="row center"><button id="sGo" class="btn mic-btn big-go" type="button">🔁 Listen, then repeat</button></div>
+        <p id="sStatus" class="s-status center" aria-live="polite"></p>
+        <div id="sResult" aria-live="polite"></div>
+        <div class="row">
+          <button id="sMine" class="btn ghost small hidden" type="button">▶ My voice</button>
+          <button id="sNext" class="btn ghost small hidden" type="button">Next sentence ›</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MY SENTENCES ============ -->
+    <section id="tab-list" class="panel">
+      <div class="card">
+        <div class="lib-head">
+          <h2>My sentences <span id="lCount" class="muted"></span></h2>
+          <input id="lSearch" type="search" placeholder="Search…">
+        </div>
+        <div id="lEmpty" class="empty hidden">No sentences yet. Add one in “Shadow a sentence”.</div>
+        <div class="table-wrap">
+          <table id="lTable" class="click-rows">
+            <thead><tr><th>Sentence</th><th>Best</th><th>Last</th><th>Tries</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="row"><button id="lPractise" class="btn primary" type="button">Practise my sentences</button></div>
+        <p class="hint">Click a sentence to shadow it again. "Practise" starts with your weakest sentences.</p>
+      </div>
+      <div class="card">
+        <h2>Today</h2>
+        <div class="stats">
+          <div class="stat"><div class="stat-val" id="tScore">0</div><div class="stat-lbl">Score</div></div>
+          <div class="stat"><div class="stat-val" id="tAvg">–</div><div class="stat-lbl">Average match</div></div>
+          <div class="stat"><div class="stat-val" id="tTries">0</div><div class="stat-lbl">Tries</div></div>
+          <div class="stat"><div class="stat-val" id="tNew">0</div><div class="stat-lbl">New sentences</div></div>
+        </div>
+        <p class="hint">A try with a match of 80% or more = 10 points.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot"><a class="home-link" href="../">Practice English with Ehsan Platform</a> · Shadowing Practice</footer>
+  <script src="app.js?v=20261117d"></script>
+  <script type="module" src="../account.js?v=20261117d"></script>
+</body>
+</html>

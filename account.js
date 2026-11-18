@@ -64,6 +64,12 @@ async function start() {
     const clean = JSON.parse(JSON.stringify({ words: p.words || [], days: p.days || {} }));
     await F.setDoc(userDoc(), { name: displayName(), email: api.user.email || '', lastActive: F.serverTimestamp(), pron: clean }, { merge: true });
   };
+  // Shadowing Practice keeps its sentences and daily scores in the "shad" field.
+  api.saveShad = async (d) => {
+    if (!api.user) return;
+    const clean = JSON.parse(JSON.stringify({ sentences: d.sentences || [], days: d.days || {} }));
+    await F.setDoc(userDoc(), { name: displayName(), email: api.user.email || '', lastActive: F.serverTimestamp(), shad: clean }, { merge: true });
+  };
   api.listStudents = async () => {
     const snap = await F.getDocs(F.collection(fs, 'users'));
     return snap.docs.map((d) => {

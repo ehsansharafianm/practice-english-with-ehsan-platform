@@ -24,6 +24,9 @@ pronunciation/    Pronunciation Practice
   app.js
   data/*.txt      American pronunciations (syllables + stress), one file per first letter
 tools/build_pron.py  Builds pronunciation/data from the CMU Pronouncing Dictionary
+shadowing/        Shadowing Practice
+  index.html
+  app.js
 ```
 
 Each new practice tool gets its own folder, a card on the home page, and an entry in the `PAGES` list in `site.js`.
@@ -91,6 +94,19 @@ days, months, countries and a few common names. Words are ordered from most to l
 Pronunciations come from the CMU Pronouncing Dictionary (BSD licence), split into syllables by `tools/build_pron.py`
 (`python tools/build_pron.py cmudict.dict pronunciation/data`). Phonetics for words missing from the list come from the free dictionaryapi.dev. Voices are the device's own; Microsoft Edge has the most natural ones.
 Signed-in students' pronunciation data is saved in the `pron` field of their `users/{uid}` document.
+
+## Shadowing Practice
+
+- Add a sentence (up to 20 words) by typing it or saying it. A missing end mark is added (? for questions).
+- The sentence is shown with the stressed (content) words in bold and an arrow for the melody at the end:
+  statements and wh- questions fall ↘, yes/no questions rise ↗.
+- **Listen, then repeat**: an American voice reads it (each word lights up), then the learner repeats it.
+  Or **Speak along** at the same time (with headphones). Voice choice and slow speed; Microsoft Edge has natural voices.
+- The page checks the words (Chrome/Edge speech recognition; same-sounding words count as right), the melody at the
+  end (pitch from the recording), how lively the voice is, and the speed. It shows a match score, the words heard,
+  a melody chart and tips. 80% or more = 10 points.
+- **My sentences** – best and last score per sentence; "Practise my sentences" starts with the weakest.
+- Signed-in students' data is saved in the `shad` field of their `users/{uid}` document.
 
 ## Run locally
 

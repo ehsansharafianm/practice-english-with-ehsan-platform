@@ -419,3 +419,31 @@ code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: .
 #dMicResult .feedback { text-align: left; }
 .mic-result.center .pscore { justify-content: center; }
 .mic-btn.say-btn { padding: 10px 16px; }
+
+/* ---------- Shadowing Practice ---------- */
+#sText { display: block; width: 100%; padding: 12px 14px; font: inherit; font-size: 1.1rem; resize: vertical;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); }
+.s-count { text-align: right; font-size: .85rem; margin-top: 4px; }
+.s-count.over { color: var(--bad); font-weight: 700; }
+.s-show { font-size: 1.6rem; line-height: 1.8; margin: 4px 0 8px; overflow-wrap: anywhere; }
+.s-show.small { font-size: 1.15rem; line-height: 1.7; margin: 10px 0 2px; }
+.s-show .sw { padding: 1px 3px; border-radius: 6px; transition: background .12s, color .12s; }
+.s-show .sw.content { font-weight: 800; }
+.s-show .sw.now { background: var(--accent); color: var(--accent-ink); }
+.s-show .sw.hit { color: var(--good); }
+.s-show .sw.miss { color: var(--bad); text-decoration: underline wavy; text-underline-offset: 4px; }
+.tune-arrow { color: var(--accent); font-weight: 800; margin-left: 2px; }
+.tune-arrow.small { font-size: .8em; opacity: .75; }
+.voice-pick { display: flex; align-items: center; gap: 8px; font-weight: 600; margin: 0; }
+.voice-pick select { margin-top: 0; width: auto; max-width: 260px; padding: 8px 10px; font: inherit; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); }
+.big-go { font-size: 1.1rem; padding: 14px 28px; margin-top: 6px; }
+.s-status { min-height: 1.5em; font-weight: 600; margin: 10px 0 0; }
+.contour-wrap { margin: 10px 0 2px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 6px; }
+.contour { display: block; width: 100%; height: 120px; }
+.contour .c-mid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 4 4; }
+.contour .c-line { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.contour .c-want { fill: none; stroke: var(--bad); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.contour .c-want.ok { stroke: var(--good); }
+.contour .c-head { fill: var(--bad); }
+.contour .c-head.ok { fill: var(--good); }
+.s-text { font-weight: 500; }

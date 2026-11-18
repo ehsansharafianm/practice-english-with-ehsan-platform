@@ -6,6 +6,7 @@
     { name: 'Home', path: '' },
     { name: 'Dictation', path: 'dictation/' },
     { name: 'Pronunciation', path: 'pronunciation/' },
+    { name: 'Shadowing', path: 'shadowing/' },
     { name: 'More soon', path: null } // placeholder for the next tool
   ];
 

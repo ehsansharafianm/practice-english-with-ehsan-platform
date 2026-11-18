@@ -11,11 +11,11 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/teachers/$(request.auth.uid));
     }
 
-    // One document per student: profile, Dictation words and daily scores, Pronunciation data (pron).
+    // One document per student: profile, Dictation words and daily scores, Pronunciation data (pron), Shadowing data (shad).
     match /users/{uid} {
       allow read: if request.auth != null && (request.auth.uid == uid || isTeacher());
       allow create, update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'email', 'createdAt', 'lastActive', 'words', 'days', 'pron']);
+        && request.resource.data.keys().hasOnly(['name', 'email', 'createdAt', 'lastActive', 'words', 'days', 'pron', 'shad']);
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
