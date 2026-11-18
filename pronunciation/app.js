@@ -318,7 +318,7 @@
   }
 
   let current = null;
-  async function showWord(text, { addToList = true } = {}) {
+  async function showWord(text, { addToList = true, keep = false } = {}) {
     const el = $('detail');
     const clean = norm(text);
     if (!clean) return;
@@ -353,19 +353,18 @@
         <label class="check slow-check"><input type="checkbox" id="slowBox" ${slow ? 'checked' : ''}> 🐢 Slow</label>
       </div>
       <p class="hint voice-note">${voiceNote()}</p>
-      ${ex.meaning ? `<div class="meaning">${ex.pos ? `<i>${esc(ex.pos)}</i> — ` : ''}${esc(ex.meaning)}${ex.example ? `<div class="muted">“${esc(ex.example)}”</div>` : ''}</div>` : ''}
       <h3 class="sub-h">Your turn</h3>
       ${SR || canRecord ? `<p class="hint">${SR ? 'Say the word. I will check it and you can play back your voice to compare.' : 'Record yourself and compare with the voices. (Checking your pronunciation works in Chrome and Edge.)'}</p>
         <div class="row"><button class="btn mic-btn" type="button" id="dMic">🎙️ Say it</button></div>
         <div id="dMicResult" class="mic-result" aria-live="polite"></div>` : '<p class="hint">Recording is not supported in this browser. Try Chrome or Edge.</p>'}
-      ${addToList && known ? '<p class="hint saved-note"></p>' : ''}`;
+      ${addToList ? '<p class="hint saved-note"></p>' : ''}`;
 
     if (ex.audioUS) $('realRec').onclick = () => playUrl(ex.audioUS);
     $('slowBox').onchange = (e) => { slow = e.target.checked; };
     const micBtn = $('dMic');
     if (micBtn) micBtn.onclick = () => runMic(micBtn, $('dMicResult'), clean, (ok) => { const w = findWord(clean); if (w) record(w, 'say', ok); });
 
-    if (addToList && (known || ex.ipa)) {
+    if (addToList && (known || ex.ipa || keep)) {
       let w = findWord(clean);
       const note = el.querySelector('.saved-note');
       if (!w) {
@@ -403,7 +402,98 @@
   }
   document.addEventListener('click', (e) => { const b = e.target.closest('[data-play]'); if (b) playUrl(b.dataset.play); });
 
-  $('wordForm').addEventListener('submit', (e) => { e.preventDefault(); showWord($('wordInput').value); });
+  // ---------- spell check (same English word list as Dictation) ----------
+  const wl = { list: null, set: null, loading: null };
+  function loadList() {
+    if (!wl.loading) {
+      wl.loading = fetch('../dictation/words.txt').then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); })
+        .then((t) => { wl.list = t.split(String.fromCharCode(10)).map((x) => x.trim()).filter(Boolean); wl.set = new Set(wl.list); return true; })
+        .catch(() => { wl.loading = null; return false; });
+    }
+    return wl.loading;
+  }
+  // Typo distance (insert, delete, change, swap); stops early above max.
+  function distance(a, b, max) {
+    const la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > max) return max + 1;
+    let prev2 = null, prev = Array.from({ length: lb + 1 }, (_, j) => j), cur;
+    for (let i = 1; i <= la; i++) {
+      cur = new Array(lb + 1); cur[0] = i;
+      let rowMin = i;
+      for (let j = 1; j <= lb; j++) {
+        let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, prev2[j - 2] + 1);
+        cur[j] = v; if (v < rowMin) rowMin = v;
+      }
+      if (rowMin > max) return max + 1;
+      prev2 = prev; prev = cur;
+    }
+    return prev[lb];
+  }
+  // Closest spellings first, more common words first; only words we have a pronunciation for.
+  async function suggest(word, n = 5) {
+    const max = word.length <= 4 ? 1 : word.length >= 9 ? 3 : 2;
+    const found = [];
+    wl.list.forEach((w, i) => { if (Math.abs(w.length - word.length) <= max) { const d = distance(word, w, max); if (d <= max) found.push({ w, d, i }); } });
+    found.sort((x, y) => x.d - y.d || x.i - y.i);
+    const out = [];
+    for (const f of found.slice(0, 25)) {
+      try { if ((await prons(f.w)).length) out.push(f.w); } catch (e) { /* ignore */ }
+      if (out.length >= n) break;
+    }
+    return out;
+  }
+  async function unknownWords(text) {
+    const bad = [];
+    for (const t of norm(text).split(' ').filter(Boolean)) {
+      let has = false;
+      try { has = (await prons(t)).length > 0; } catch (e) { /* ignore */ }
+      if (!has && !wl.set.has(t) && !wl.set.has(t.replace(/'s$/, ''))) bad.push(t);
+    }
+    return bad;
+  }
+  let acceptedSpelling = '';
+  async function showSpellBox(text, word) {
+    const box = $('spellBox');
+    box.innerHTML = '<p class="muted">Looking for suggestions…</p>';
+    box.classList.remove('hidden');
+    const sugs = await suggest(word);
+    box.innerHTML = `
+      <p>⚠ <b>"${esc(word)}"</b> doesn't look like a correct English spelling.</p>
+      ${sugs.length ? `<p class="muted">Did you mean:</p><div class="sugs">${sugs.map((s) => `<button type="button" class="btn ghost small sug" data-sug="${esc(s)}">${esc(s)}</button>`).join('')}</div>`
+        : '<p class="muted">No suggestions found.</p>'}
+      <div class="row" style="margin-top:0">
+        <button type="button" class="btn ghost small" id="spellKeep">No, use "${esc(text)}"</button>
+        <button type="button" class="btn ghost small" id="spellEdit">Edit it myself</button>
+      </div>`;
+    box.querySelectorAll('.sug').forEach((b) => b.addEventListener('click', () => {
+      $('wordInput').value = norm($('wordInput').value).split(' ').map((t) => (t === word ? b.dataset.sug : t)).join(' ');
+      box.classList.add('hidden');
+      $('wordForm').requestSubmit();
+    }));
+    $('spellKeep').onclick = () => { acceptedSpelling = norm(text); box.classList.add('hidden'); $('wordForm').requestSubmit(); };
+    $('spellEdit').onclick = () => { box.classList.add('hidden'); $('wordInput').focus(); $('wordInput').select(); };
+  }
+  $('wordInput').addEventListener('focus', loadList, { once: true });
+  $('wordInput').addEventListener('input', () => $('spellBox').classList.add('hidden'));
+
+  $('wordForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = $('wordInput').value;
+    if (!norm(text)) return;
+    if (norm(text) !== acceptedSpelling) {
+      const btn = $('wordAdd');
+      btn.disabled = true; btn.textContent = 'Checking…';
+      const ok = await loadList();
+      const bad = ok ? await unknownWords(text) : [];
+      btn.disabled = false; btn.textContent = 'Add word';
+      if (bad.length) { showSpellBox(text, bad[0]); return; }
+    }
+    const keep = norm(text) === acceptedSpelling;
+    acceptedSpelling = '';
+    $('spellBox').classList.add('hidden');
+    showWord(text, { keep });
+  });
 
   // ---------- tabs ----------
   function showTab(name) {
@@ -578,7 +668,7 @@
       return;
     }
     const tr = e.target.closest('tr[data-id]');
-    if (tr) { const w = db.words.find((x) => x.id === tr.dataset.id); if (w) { showTab('word'); $('wordInput').value = w.text; showWord(w.text); } }
+    if (tr) { const w = db.words.find((x) => x.id === tr.dataset.id); if (w) { showTab('word'); $('wordInput').value = w.text; $('spellBox').classList.add('hidden'); showWord(w.text); } }
   });
   $('wTable').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr[data-id]')) e.target.click(); });
 

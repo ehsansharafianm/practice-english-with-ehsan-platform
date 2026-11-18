@@ -73,7 +73,7 @@ days, months, countries and a few common names. Words are ordered from most to l
 
 ## Pronunciation Practice
 
-- **New word** – type a word to see its American pronunciation: IPA phonetics, the syllables, and which syllable
+- **Add new word** – type a word (spelling is checked, with suggestions, or keep it anyway) to see its American pronunciation: IPA phonetics, the syllables, and which syllable
   is stressed (the big coloured one; secondary stress has a coloured border). Each syllable also has a simple
   "sounds like" spelling (e.g. pruh · nun · see · AY · shuhn). Listen with a woman's or a man's US voice (normal or
   slow), or a real recording when the online dictionary has one. Then click **Say it**: the browser checks what you

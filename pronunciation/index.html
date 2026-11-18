@@ -21,7 +21,7 @@
   </header>
 
   <nav class="tabs" role="tablist">
-    <button class="tab active" data-tab="word" role="tab">New word</button>
+    <button class="tab active" data-tab="word" role="tab">Add new word</button>
     <button class="tab" data-tab="practice" role="tab">Practice</button>
     <button class="tab" data-tab="words" role="tab">My words</button>
   </nav>
@@ -30,12 +30,15 @@
     <!-- ============ NEW WORD ============ -->
     <section id="tab-word" class="panel active">
       <div class="card">
-        <h2>Look up a word</h2>
-        <p class="hint">Type a word to see its American pronunciation: phonetics, syllables and stress. Listen to a woman's and a man's voice, then record yourself.</p>
-        <form id="wordForm" class="row" autocomplete="off" style="margin-top:4px">
-          <input id="wordInput" type="text" required maxlength="60" placeholder="e.g. pronunciation"
-                 autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1; min-width:180px">
-          <button class="btn primary" type="submit">Show</button>
+        <h2>Add a new word</h2>
+        <p class="hint">Type a word to see its American pronunciation: phonetics, syllables and stress. Listen to a woman's and a man's voice, then record yourself. The word is saved to My words for practice.</p>
+        <form id="wordForm" autocomplete="off" style="margin-top:4px">
+          <div class="row" style="margin-top:0">
+            <input id="wordInput" type="text" required maxlength="60" placeholder="e.g. pronunciation"
+                   autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1; min-width:180px; margin-top:0">
+            <button id="wordAdd" class="btn primary" type="submit">Add word</button>
+          </div>
+          <div id="spellBox" class="spell hidden" aria-live="polite"></div>
         </form>
       </div>
 
