@@ -583,6 +583,7 @@
           <button type="button" class="btn ghost small" data-act="listen" title="Listen to the voice">▶</button>
           <button type="button" class="btn ghost small" data-act="me" title="Hear my voice"${r && r.audio ? '' : ' disabled'}>🎧</button>
           <button type="button" class="btn ghost small" data-act="again" title="Repeat this sentence">🔁</button>
+          <button type="button" class="btn ghost small" data-act="remove" title="${busyOn(k) ? 'This sentence is playing now. Skip it first.' : 'Remove from this text'}"${busyOn(k) ? ' disabled' : ''}>✕</button>
         </td></tr>${open ? `<tr class="row-detail"><td colspan="4">${r.html.replace(/ah(\d+)/g, 'ah$1' + tag)}</td></tr>` : ''}`;
     }).join('');
   }
@@ -608,12 +609,24 @@
     if (run.phase === 'wait') { run.redo = true; wake(); }
     else { run.redoNow = true; if (canSpeak) speechSynthesis.cancel(); if (mic) mic.stop(); }
   }
+  // The sentence being read or recorded right now cannot be removed.
+  const busyOn = (k) => run.active && !run.paused && run.phase === 'try' && k === run.i;
+  // Remove sentence k from the text being shadowed (it is not deleted from My sentences).
+  function removeFromRun(k) {
+    if (busyOn(k) || !confirm(`Remove this sentence from the text?\n\n${run.list[k]}`)) return;
+    run.list.splice(k, 1); run.results.splice(k, 1);
+    if (k < run.i) run.i--;
+    if (run.open === k) run.open = null; else if (run.open > k) run.open--;
+    if (!run.list.length) { run.active = false; wake(); $('tRun').classList.add('hidden'); $('tDone').classList.add('hidden'); $('tSetup').classList.remove('hidden'); return; }
+    if (run.active) renderRun(); else finishRun();
+  }
   function onRows(e) {
     const tr = e.target.closest('tr[data-k]');
     if (!tr) return;
     const k = +tr.dataset.k, btn = e.target.closest('[data-act]');
     if (btn) {
       if (btn.dataset.act === 'listen') speak(run.list[k], '#none');
+      else if (btn.dataset.act === 'remove') removeFromRun(k);
       else if (btn.dataset.act === 'me') playAudio((run.results[k] || {}).audio);
       else redoSentence(k);
       return;
@@ -761,7 +774,7 @@
       <div class="line">${done.filter((x) => x.r.pct >= 80).length} sentence(s) at 80% or more · today's shadowing score: <b>${(db.days[todayKey()] || {}).score || 0}</b> points.</div>
       <div class="table-wrap" style="margin-top:12px"><table class="click-rows score-rows"><thead><tr><th>#</th><th>Sentence</th><th>Match</th><th></th></tr></thead>
       <tbody id="tSumBody">${rowsHtml('sum')}</tbody></table></div>
-      <p class="hint">Click a sentence to see its analysis and melody chart. ▶ the voice · 🎧 your voice · 🔁 practise it again.</p>`;
+      <p class="hint">Click a sentence to see its analysis and melody chart. ▶ the voice · 🎧 your voice · 🔁 practise it again · ✕ remove it from this text.</p>`;
     $('tSumBody').onclick = onRows;
     $('tWeak').classList.toggle('hidden', !weak.length);
     $('tWeak').textContent = `Practise the ${weak.length} sentence${weak.length === 1 ? '' : 's'} under 80% again`;
@@ -839,8 +852,34 @@
     $('fEmpty').classList.toggle('hidden', all.length > 0);
     $('fPractise').classList.toggle('hidden', !all.length);
     const cell = (s, v) => (!s.tries || v === null || v === undefined ? '<td class="muted">–</td>' : `<td class="${v >= 80 ? 'acc-good' : 'acc-bad'}">${v}%</td>`);
-    $('fTable').querySelector('tbody').innerHTML = list.map((s) => `<tr data-id="${esc(s.id)}" tabindex="0"><td><div class="w s-text">${esc(s.text)}</div></td>
-      ${cell(s, s.best)}${cell(s, s.last)}<td>${s.tries || 0}</td><td>${starBtn(s)}</td></tr>`).join('');
+    $('fTable').querySelector('tbody').innerHTML = list.map((s) => s.id === favEditing
+      ? `<tr class="edit-row" data-edit="${esc(s.id)}"><td colspan="5">
+          <textarea class="f-edit" rows="2" maxlength="300" aria-label="Edit the sentence">${esc(s.text)}</textarea>
+          <div class="row" style="margin-top:6px; align-items:center">
+            <button class="btn primary small" type="button" data-save="${esc(s.id)}">Save</button>
+            <button class="btn ghost small" type="button" data-cancel="1">Cancel</button>
+            <span class="f-edit-msg muted" aria-live="polite"></span>
+          </div></td></tr>`
+      : `<tr data-id="${esc(s.id)}" tabindex="0"><td><div class="w s-text">${esc(s.text)}</div></td>
+      ${cell(s, s.best)}${cell(s, s.last)}<td>${s.tries || 0}</td>
+      <td class="nowrap"><button class="star" type="button" data-editid="${esc(s.id)}" title="Edit this sentence">✎</button>${starBtn(s)}<button class="del" type="button" data-fdel="${esc(s.id)}" title="Delete this sentence">✕</button></td></tr>`).join('');
+    const box = $('fTable').querySelector('.f-edit');
+    if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+  }
+  let favEditing = null;
+  // Save an edited favorite. The scores stay with the sentence.
+  function saveEdit(id) {
+    const s = db.sentences.find((x) => x.id === id), row = $('fTable').querySelector('.edit-row');
+    if (!s || !row) return;
+    const say = (t) => { row.querySelector('.f-edit-msg').textContent = t; };
+    const raw = clean(row.querySelector('.f-edit').value), n = wordsOf(raw).length;
+    if (n < 2) return say('Please write a sentence of two words or more.');
+    if (n > MAX_WORDS) return say(`Please keep it to ${MAX_WORDS} words or fewer (now ${n}).`);
+    const text = tidy(raw), other = findSentence(text);
+    if (other && other !== s) return say(other.fav ? 'This sentence is already in your favorites.' : 'This sentence is already in My sentences. Star it there instead.');
+    s.text = text;
+    favEditing = null; save(); renderFav();
+    if (cur === s) open(s);
   }
   $('fSearch').addEventListener('input', renderFav);
   $('fAdd').addEventListener('click', () => {
@@ -860,10 +899,31 @@
   });
   $('fTable').addEventListener('click', (e) => {
     if (toggleStar(e)) { renderFav(); return; }
+    const fd = e.target.closest('[data-fdel]');
+    if (fd) {
+      const s = db.sentences.find((x) => x.id === fd.dataset.fdel);
+      if (s && confirm(`Delete this sentence?\n\n${s.text}\n\nIt is removed from Favorites and My sentences, with its scores.`)) {
+        db.sentences = db.sentences.filter((x) => x !== s); save(); renderFav();
+      }
+      return;
+    }
+    const ed = e.target.closest('[data-editid]');
+    if (ed) { favEditing = ed.dataset.editid; renderFav(); return; }
+    const sv = e.target.closest('[data-save]');
+    if (sv) { saveEdit(sv.dataset.save); return; }
+    if (e.target.closest('[data-cancel]')) { favEditing = null; renderFav(); return; }
+    if (e.target.closest('.edit-row')) return;
     const tr = e.target.closest('tr[data-id]');
     if (tr) { const s = db.sentences.find((x) => x.id === tr.dataset.id); if (s) { showTab('practise'); $('sText').value = s.text; countWords(); open(s); } }
   });
-  $('fTable').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr[data-id]')) e.target.click(); });
+  $('fTable').addEventListener('keydown', (e) => {
+    if (e.target.matches('.f-edit')) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(favEditing); }
+      else if (e.key === 'Escape') { favEditing = null; renderFav(); }
+      return;
+    }
+    if (e.key === 'Enter' && e.target.matches('tr[data-id]')) e.target.click();
+  });
   $('fPractise').addEventListener('click', () => {
     const all = favs();
     if (!all.length) return;
