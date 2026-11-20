@@ -796,7 +796,7 @@
   // The caption helper's address (see worker/). On this computer, a helper started with "npm run dev" is used.
   const CAPTIONS_API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'http://127.0.0.1:8787' : 'https://pewe-captions.practice-english-ehsan.workers.dev';
   const VIDEO_KEY = 'pewe-shadow-video';
-  const vid = { id: '', title: '', auto: false, sents: [], i: 0, results: [], busy: false, stop: false };
+  const vid = { id: '', title: '', auto: false, sents: [], i: 0, results: [], busy: false, run: 0 };
   let yt = null, ytReady = null;
 
   function ytId(s) {
@@ -906,6 +906,7 @@
   window.__peweShadowTest.speechNotes = speechNotes;
   window.__peweShadowTest.buildSentences = buildSentences;
   window.__peweShadowTest.parseTranscript = parseTranscript;
+  window.__peweShadowTest.video = () => vid; // for developer checks
 
   // ---- the YouTube player ----
   function loadYT() {
@@ -928,20 +929,37 @@
       yt = new YT.Player('vPlayer', { videoId: id, playerVars: { playsinline: 1, rel: 0, modestbranding: 1, cc_load_policy: 0 }, events: { onReady: resolve } });
     });
   }
-  // Plays from..to, then pauses. Resolves when it has played (or the learner paused it).
-  function playPart(from, to) {
+  // Every action that uses the player (Speaker, Play then repeat, a row's ▶) gets its own number.
+  // Starting a new action, Previous, Next or Stop changes the number, so an older action stops quietly
+  // and never touches the player or the page again.
+  const newRun = () => ++vid.run;
+  const isRun = (n) => n === vid.run;
+  function pausePlayer() { try { if (yt && yt.pauseVideo) yt.pauseVideo(); } catch (e) { /* ignore */ } }
+
+  // Plays from..to, then pauses. Resolves true when the part has played (or the learner paused it),
+  // false when it was stopped or the video did not start.
+  function playPart(from, to, run) {
     return new Promise((resolve) => {
       if (!yt || !yt.seekTo) return resolve(false);
       if (canSpeak) speechSynthesis.cancel();
-      yt.setPlaybackRate($('vSlow').checked ? 0.75 : 1);
+      if (audioEl) audioEl.pause();
+      const rate = $('vSlow').checked ? 0.75 : 1;
+      yt.setPlaybackRate(rate);
       yt.seekTo(from, true); yt.playVideo();
-      const rate = $('vSlow').checked ? 0.75 : 1, limit = Date.now() + ((to - from) / rate + 6) * 1000;
-      let started = false;
+      const startBy = Date.now() + 12000, endBy = (to - from) / rate * 1000 + 4000;
+      let started = 0;
       const tick = setInterval(() => {
+        if (!isRun(run)) { clearInterval(tick); return resolve(false); } // a newer action owns the player now
         const t = yt.getCurrentTime(), st = yt.getPlayerState();
-        if (st === 1) started = true;
-        if (t >= to || Date.now() > limit || (started && st === 2) || vid.stop) {
-          clearInterval(tick); if (st === 1) yt.pauseVideo(); resolve(!vid.stop);
+        if (!started) {
+          // Right after a jump the player can still report the old time, so only count it as started
+          // once it is really playing inside this sentence.
+          if (st === 1 && t >= from - 1.5 && t < to) started = Date.now();
+          else if (Date.now() > startBy) { clearInterval(tick); pausePlayer(); resolve(false); }
+          return;
+        }
+        if (t >= to - 0.12 || st === 0 || st === 2 || Date.now() - started > endBy) { // stop a moment early: pausing takes a little time
+          clearInterval(tick); pausePlayer(); resolve(true);
         }
       }, 40);
     });
@@ -1023,21 +1041,39 @@
     const sel = $('vTable').querySelector('tr.sel');
     if (sel) { const box = sel.closest('.v-list'); box.scrollTop = Math.max(0, sel.offsetTop - box.clientHeight / 2); }
   }
-  function goTo(k) { if (vid.busy) cancelTry(); vid.i = Math.max(0, Math.min(vid.sents.length - 1, k)); saveVideo(); showSentence(); }
-  function cancelTry() { vid.stop = true; if (mic) mic.stop(); if (yt && yt.pauseVideo) yt.pauseVideo(); }
+  function goTo(k) { cancelTry(); vid.i = Math.max(0, Math.min(vid.sents.length - 1, k)); saveVideo(); showSentence(); }
+  // Stops whatever is going on (speaker, recording, waiting) and puts the buttons back at once.
+  function cancelTry() {
+    newRun();
+    if (mic) mic.stop();
+    pausePlayer();
+    resetGo();
+  }
+  function resetGo() {
+    vid.busy = false;
+    $('vGo').classList.remove('on'); $('vGo').textContent = '🔁 Play, then repeat';
+    $('vDoneSpeak').classList.add('hidden');
+    if (/Next sentence in|Listen to|Your turn|Checking/.test($('vStatus').textContent)) $('vStatus').textContent = '';
+  }
+  // Speaker: plays one sentence from the video. Stops a try that is going on.
+  async function playOnly(k) {
+    cancelTry();
+    const s = vid.sents[k];
+    await playPart(s.start, s.end, newRun());
+  }
   $('vPrev').addEventListener('click', () => goTo(vid.i - 1));
   $('vNext').addEventListener('click', () => goTo(vid.i + 1));
-  $('vPlay').addEventListener('click', async () => { if (vid.busy) return; const s = vid.sents[vid.i]; vid.stop = false; await playPart(s.start, s.end); });
-  $('vTable').addEventListener('click', async (e) => {
+  $('vPlay').addEventListener('click', () => playOnly(vid.i));
+  $('vTable').addEventListener('click', (e) => {
     const tr = e.target.closest('tr[data-k]');
     if (!tr) return;
     const k = +tr.dataset.k, act = e.target.closest('[data-act]');
     if (act && act.dataset.act === 'me') { playAudio((vid.results[k] || {}).audio); return; }
-    if (act && act.dataset.act === 'play') { if (vid.busy) return; const s = vid.sents[k]; vid.stop = false; await playPart(s.start, s.end); return; }
+    if (act && act.dataset.act === 'play') { playOnly(k); return; }
     goTo(k);
   });
   $('vChange').addEventListener('click', () => { cancelTry(); $('vRun').classList.add('hidden'); $('vSetup').classList.remove('hidden'); offerResume(); });
-  $('vMine').addEventListener('click', () => playAudio((vid.results[vid.i] || {}).audio));
+  $('vMine').addEventListener('click', () => { if (vid.busy) cancelTry(); pausePlayer(); playAudio((vid.results[vid.i] || {}).audio); });
   $('vDoneSpeak').addEventListener('click', () => { if (mic) mic.stop(); });
   $('vSlow').addEventListener('change', () => { if (yt && yt.setPlaybackRate) yt.setPlaybackRate($('vSlow').checked ? 0.75 : 1); });
   $('vFav').addEventListener('click', () => {
@@ -1049,44 +1085,47 @@
 
   // Play the sentence, record the learner, score; with "Go on by itself", continue with the next one.
   $('vGo').addEventListener('click', async () => {
-    if (vid.busy) { cancelTry(); return; }
+    if (vid.busy) { cancelTry(); return; } // the green button also stops
     if (!SR && !canRecord) { $('vStatus').textContent = 'Recording is not supported in this browser. Try Chrome or Edge.'; return; }
-    vid.busy = true; vid.stop = false;
+    cancelTry(); // stops a Speaker play that may be going on
+    const run = newRun();
+    vid.busy = true;
     const go = $('vGo');
     go.classList.add('on');
     try {
-      do {
+      while (isRun(run)) {
         const k = vid.i, s = vid.sents[k];
         $('vResult').innerHTML = ''; $('vMine').disabled = true;
         go.textContent = '👂 Listen… (click to stop)'; $('vStatus').textContent = 'Listen to the speaker…';
-        if (!(await playPart(s.start, s.end))) break;
+        const played = await playPart(s.start, s.end, run);
+        if (!isRun(run)) return;
+        if (!played) { $('vStatus').textContent = 'The video did not start. Click ▶ on the video once, then try again.'; break; }
         go.textContent = '🎙️ Your turn! (click to stop)'; $('vStatus').innerHTML = '<b>Your turn:</b> say it now, the same way.';
         $('vDoneSpeak').classList.remove('hidden');
         const r = await listenOnce(Math.max(3, (s.end - s.start) / ($('vSlow').checked ? 0.75 : 1)) * 2 + 4);
+        if (!isRun(run)) return; // stopped while recording: forget this try
         $('vDoneSpeak').classList.add('hidden');
-        if (vid.stop) break;
         if (r.error && !r.heard && micMessage(r.error)) { $('vStatus').textContent = ''; $('vResult').innerHTML = `<p class="feedback wrong">${esc(micMessage(r.error))}</p>`; break; }
         $('vStatus').textContent = 'Checking…';
         let a = null;
         if (r.audio) { try { a = await analyse(r.audio); } catch (err) { console.warn('Analysis failed', err); } }
+        if (!isRun(run)) return;
         const res = await scoreTry(findSentence(s.text) || { text: s.text }, r.heard, a, !!SR);
         vid.results[k] = { pct: res.pct, audio: r.audio, html: res.html };
         saveVideo();
+        if (!isRun(run)) return;
         $('vStatus').textContent = '';
         $('vResult').innerHTML = res.html;
         $('vMine').disabled = !r.audio; $('vMine').title = 'Hear your last try';
         renderVideoList();
         $('vBar').style.width = Math.round((vid.results.filter(Boolean).length / vid.sents.length) * 100) + '%';
         if (!$('vOn').checked || vid.i >= vid.sents.length - 1) break;
-        for (let n = 4; n > 0 && !vid.stop; n--) { $('vStatus').innerHTML = `Next sentence in <b>${n}</b>… (click the green button to stop)`; await new Promise((res2) => setTimeout(res2, 1000)); }
-        if (vid.stop) break;
+        for (let n = 4; n > 0 && isRun(run); n--) { $('vStatus').innerHTML = `Next sentence in <b>${n}</b>… (click the green button to stop)`; await new Promise((res2) => setTimeout(res2, 1000)); }
+        if (!isRun(run)) return;
         vid.i++; saveVideo(); showSentence();
-      } while (!vid.stop);
+      }
     } finally {
-      vid.busy = false; vid.stop = false;
-      go.classList.remove('on'); go.textContent = '🔁 Play, then repeat';
-      $('vDoneSpeak').classList.add('hidden');
-      if (/Next sentence in|Listen to|Your turn/.test($('vStatus').textContent)) $('vStatus').textContent = '';
+      if (isRun(run)) resetGo(); // an older run leaves the buttons to the newer one
       flushCloud();
     }
   });
