@@ -787,12 +787,305 @@
   $('tNew').addEventListener('click', () => { $('tDone').classList.add('hidden'); $('tSetup').classList.remove('hidden'); });
   window.__peweShadowTest.splitText = splitText;
 
+  // =====================================================
+  // SHADOW A VIDEO: paste a YouTube link. The caption helper (worker/, a Cloudflare Worker) sends the
+  // captions with their times; the page cuts them into sentences, plays each one from the video,
+  // records the learner and scores the try. If the helper cannot get the captions, the learner pastes
+  // YouTube's transcript instead.
+  // =====================================================
+  // The caption helper's address (see worker/). On this computer, a helper started with "npm run dev" is used.
+  const CAPTIONS_API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'http://127.0.0.1:8787' : 'https://pewe-captions.practice-english-ehsan.workers.dev';
+  const VIDEO_KEY = 'pewe-shadow-video';
+  const vid = { id: '', title: '', auto: false, sents: [], i: 0, results: [], busy: false, stop: false };
+  let yt = null, ytReady = null;
+
+  function ytId(s) {
+    s = String(s || '').trim();
+    if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+    try {
+      const u = new URL(/^https?:\/\//i.test(s) ? s : 'https://' + s);
+      const host = u.hostname.replace(/^(www\.|m\.|music\.)/, '');
+      const id = host === 'youtu.be' ? u.pathname.slice(1).split('/')[0]
+        : /^youtube(-nocookie)?\.com$/.test(host) ? (u.searchParams.get('v') || (u.pathname.match(/^\/(?:shorts|embed|live|v)\/([^/?#]+)/) || [])[1] || '') : '';
+      return /^[A-Za-z0-9_-]{11}$/.test(id) ? id : '';
+    } catch (e) { return ''; }
+  }
+  const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+
+  // Caption pieces [{t, d, w}] -> sentences [{text, start, end}].
+  // Each piece is cut into words with an estimated time. With punctuation (captions written by people)
+  // sentences end at . ? !; automatic captions have none, so pauses in the speech end the sentence.
+  function buildSentences(pieces) {
+    const words = [];
+    pieces.forEach((p, k) => {
+      const txt = String(p.w || '').replace(/\[[^\]]*\]|\([^)]*\)|♪|>>+|^-\s*/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!txt) return;
+      const next = pieces[k + 1];
+      const end = Math.min(p.t + (p.d || 2), next && next.t > p.t ? next.t : Infinity);
+      const ws = txt.split(' ');
+      ws.forEach((w, i) => words.push({ w, t: p.t + ((end - p.t) * i) / ws.length, e: p.t + ((end - p.t) * (i + 1)) / ws.length }));
+    });
+    if (!words.length) return [];
+    const punctuated = words.filter((x) => /[.?!]["'”’)]*$/.test(x.w)).length >= Math.max(1, words.length / 40);
+    const out = [];
+    let buf = [];
+    const push = () => { if (buf.length) out.push(buf); buf = []; };
+    words.forEach((x, i) => {
+      buf.push(x);
+      const next = words[i + 1], gap = next ? next.t - x.e : 9;
+      const ends = punctuated ? /[.?!]["'”’)]*$/.test(x.w) && !ABBR.test(x.w.replace(/["'”’)]+$/, '')) : gap > 0.6 && buf.length >= 3;
+      if (ends || (buf.length >= MAX_WORDS && (gap > 0.15 || /[,;:]$/.test(x.w))) || buf.length >= MAX_WORDS + 6) push();
+    });
+    push();
+    // very short pieces join the sentence before when they follow it closely
+    const merged = [];
+    out.forEach((b) => { const last = merged[merged.length - 1]; if (last && b.length < 3 && last.length + b.length <= MAX_WORDS + 4 && b[0].t - last[last.length - 1].e < 0.8) last.push(...b); else merged.push(b); });
+    return merged.map((b, k) => {
+      let text = b.map((x) => x.w).join(' ').replace(/\bi\b/g, 'I').replace(/\bi'(m|ll|ve|d)\b/gi, "I'$1");
+      text = punctuated ? text[0].toUpperCase() + text.slice(1) : tidy(text.replace(/[,;:]+$/, ""));
+      const nextStart = merged[k + 1] ? merged[k + 1][0].t : Infinity;
+      return { text, start: Math.max(0, b[0].t - 0.2), end: Math.min(b[b.length - 1].e + 0.35, nextStart + 0.1) };
+    }).filter((s) => wordsOf(s.text).length >= 2);
+  }
+
+  // YouTube's "Show transcript" text: time lines ("1:23") followed by caption lines.
+  function parseTranscript(raw) {
+    const pieces = [];
+    let t = null;
+    String(raw || '').replace(/\r/g, '').split('\n').forEach((line) => {
+      line = line.trim();
+      if (!line) return;
+      const m = line.match(/^(?:(\d+):)?(\d{1,2}):(\d{2})(?:\s+(.*))?$/);
+      if (m) {
+        t = (+m[1] || 0) * 3600 + +m[2] * 60 + +m[3];
+        if (m[4]) pieces.push({ t, w: m[4] });
+        return;
+      }
+      if (/^\d+\s+(hours?|minutes?|seconds?)(,\s*\d+\s+(minutes?|seconds?))*$/i.test(line)) return; // screen-reader time label
+      if (t === null) return;
+      const last = pieces[pieces.length - 1];
+      if (last && last.t === t) last.w += ' ' + line; else pieces.push({ t, w: line });
+    });
+    pieces.forEach((p, i) => { p.d = pieces[i + 1] ? Math.max(0.3, pieces[i + 1].t - p.t) : 4; });
+    return pieces;
+  }
+
+  // ---- connected speech: how the sentence really sounds ----
+  const REDUCE = [
+    [/\bwant to\b/i, 'want to', 'wanna'], [/\bgoing to (?!the\b|a\b|school\b|work\b|bed\b)/i, 'going to', 'gonna'], [/\bgot to\b/i, 'got to', 'gotta'],
+    [/\bhave to\b/i, 'have to', 'hafta'], [/\bhas to\b/i, 'has to', 'hasta'], [/\bkind of\b/i, 'kind of', 'kinda'], [/\bsort of\b/i, 'sort of', 'sorta'],
+    [/\ba lot of\b/i, 'a lot of', 'a lotta'], [/\bout of\b/i, 'out of', 'outta'], [/\b(don't|do not) know\b/i, "don't know", 'dunno'],
+    [/\blet me\b/i, 'let me', 'lemme'], [/\bgive me\b/i, 'give me', 'gimme'], [/\bdid you\b/i, 'did you', 'didja'], [/\bwould you\b/i, 'would you', 'wouldja'],
+    [/\bcould you\b/i, 'could you', 'couldja'], [/\bdon't you\b/i, "don't you", 'doncha'], [/\bwhat do you\b/i, 'what do you', 'whaddaya'], [/\bgot you\b/i, 'got you', 'gotcha']
+  ];
+  const WEAK = { and: 'n', to: 'tə', of: 'əv', for: 'fər', can: 'kən', you: 'yə', your: 'yər', a: 'ə', the: 'thə', at: 'ət', from: 'frəm', was: 'wəz', are: 'ər' };
+  const VOWEL = /^[aeiou]/i;
+  function speechNotes(text) {
+    const notes = [], low = clean(text).toLowerCase();
+    REDUCE.forEach(([re, from, to]) => { if (re.test(low)) notes.push(`<b>${esc(from)}</b> usually sounds like <span class="say">“${esc(to)}”</span> in fast American speech.`); });
+    const ws = wordsOf(text).map(core);
+    // flap T inside a word: water, better, city, little
+    const flap = [...new Set(ws.filter((w) => /[aeiouy]r?tt?(?=[aouy]|i(?!on)|e(?!s?$))/.test(w) && !/^(at|it|to)$/.test(w) && w.length > 3))].slice(0, 3);
+    if (flap.length) notes.push(`American T: in ${flap.map((w) => `<b>${esc(w)}</b>`).join(', ')} the <b>t</b> between vowels sounds like a quick soft <b>d</b> (<span class="say">“wa-der”</span> for water).`);
+    // across words: T + vowel (get it -> ge-dit), then other consonant + vowel links
+    const links = [];
+    for (let i = 0; i < ws.length - 1 && links.length < 3; i++) {
+      const a = ws[i], b = ws[i + 1];
+      if (!a || !b || !VOWEL.test(b) || /^(a|i)$/.test(a)) continue;
+      const B = b === 'i' ? 'I' : b;
+      if (/[aeiour]t$/.test(a)) links.push(`<b>${esc(a)} ${esc(B)}</b> → <span class="say">“${esc(a.slice(0, -1))}-d${esc(B)}”</span>`);
+      else if (/[bcdfgklmnprsvxz]$/.test(a) && !/'/.test(a)) links.push(`<b>${esc(a)}‿${esc(B)}</b>`);
+    }
+    if (links.length) notes.push(`Link the words, with no stop between them: ${links.join(', ')}.`);
+    const weak = [...new Set(ws.filter((w) => WEAK[w]))].filter((w) => !/^(a|the)$/.test(w)).slice(0, 4);
+    if (weak.length) notes.push(`Small words are short and weak: ${weak.map((w) => `<b>${esc(w)}</b> → <span class="say">${esc(WEAK[w])}</span>`).join(', ')}.`);
+    const drop = ws.find((w, i) => /^(just|next|must|last|first|most|don't|can't)$/.test(w) && ws[i + 1] && !VOWEL.test(ws[i + 1]));
+    if (drop) notes.push(`The <b>t</b> at the end of <b>${esc(drop)}</b> is often almost silent before a consonant.`);
+    return notes.slice(0, 5);
+  }
+  window.__peweShadowTest.speechNotes = speechNotes;
+  window.__peweShadowTest.buildSentences = buildSentences;
+  window.__peweShadowTest.parseTranscript = parseTranscript;
+
+  // ---- the YouTube player ----
+  function loadYT() {
+    if (ytReady) return ytReady;
+    ytReady = new Promise((resolve, reject) => {
+      if (window.YT && window.YT.Player) return resolve();
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(); };
+      const s = document.createElement('script');
+      s.src = 'https://www.youtube.com/iframe_api';
+      s.onerror = () => { ytReady = null; reject(new Error('YouTube player could not load')); };
+      document.head.appendChild(s);
+    });
+    return ytReady;
+  }
+  async function makePlayer(id) {
+    await loadYT();
+    if (yt) { yt.cueVideoById(id); return; }
+    await new Promise((resolve) => {
+      yt = new YT.Player('vPlayer', { videoId: id, playerVars: { playsinline: 1, rel: 0, modestbranding: 1, cc_load_policy: 0 }, events: { onReady: resolve } });
+    });
+  }
+  // Plays from..to, then pauses. Resolves when it has played (or the learner paused it).
+  function playPart(from, to) {
+    return new Promise((resolve) => {
+      if (!yt || !yt.seekTo) return resolve(false);
+      if (canSpeak) speechSynthesis.cancel();
+      yt.setPlaybackRate($('vSlow').checked ? 0.75 : 1);
+      yt.seekTo(from, true); yt.playVideo();
+      const rate = $('vSlow').checked ? 0.75 : 1, limit = Date.now() + ((to - from) / rate + 6) * 1000;
+      let started = false;
+      const tick = setInterval(() => {
+        const t = yt.getCurrentTime(), st = yt.getPlayerState();
+        if (st === 1) started = true;
+        if (t >= to || Date.now() > limit || (started && st === 2) || vid.stop) {
+          clearInterval(tick); if (st === 1) yt.pauseVideo(); resolve(!vid.stop);
+        }
+      }, 40);
+    });
+  }
+
+  // ---- loading a video ----
+  function vMsg(html) { $('vMsg').innerHTML = html; }
+  $('vForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = ytId($('vLink').value);
+    if (!id) return vMsg('Please paste a YouTube link, for example https://www.youtube.com/watch?v=…');
+    if (!CAPTIONS_API) { $('vPasteBox').open = true; return vMsg('Finding the captions by link is not switched on yet. Please paste the transcript below.'); }
+    $('vLoad').disabled = true; vMsg('Finding the sentences…');
+    let data = null;
+    try {
+      const r = await fetch(`${CAPTIONS_API}/captions?v=${encodeURIComponent(id)}`);
+      data = await r.json();
+    } catch (err) { data = { error: 'failed', message: 'Could not reach the caption helper.' }; }
+    $('vLoad').disabled = false;
+    if (data.error) { $('vPasteBox').open = true; return vMsg(`${esc(data.message || 'Could not get the captions.')} You can paste the transcript below instead.`); }
+    startVideo({ id, title: data.title, auto: data.auto, sents: buildSentences(data.words) });
+  });
+  $('vUsePaste').addEventListener('click', () => {
+    const id = ytId($('vLink').value);
+    if (!id) return vMsg('Please paste the video link in the box above too, so the page can play the video.');
+    const pieces = parseTranscript($('vPaste').value);
+    if (pieces.length < 2) return vMsg('I could not find times in this transcript. Copy it from YouTube\'s “Show transcript” panel, with the times (like 0:12).');
+    startVideo({ id, title: '', auto: false, sents: buildSentences(pieces) });
+  });
+  async function startVideo({ id, title, auto, sents, i = 0, results = [] }) {
+    if (!sents.length) return vMsg('I could not find any sentences in this video.');
+    Object.assign(vid, { id, title: title || 'YouTube video', auto, sents, i: Math.min(i, sents.length - 1), results, stop: false });
+    vMsg('');
+    $('vSetup').classList.add('hidden'); $('vRun').classList.remove('hidden');
+    $('vTitle').textContent = vid.title;
+    $('vAuto').textContent = `${sents.length} sentences${auto ? ' · automatic captions, some words may be wrong' : ''}`;
+    saveVideo();
+    showSentence();
+    try { await makePlayer(id); } catch (err) { $('vStatus').textContent = 'The YouTube player could not load. Check your internet connection.'; }
+  }
+  function saveVideo() { try { localStorage.setItem(VIDEO_KEY, JSON.stringify({ id: vid.id, title: vid.title, auto: vid.auto, sents: vid.sents, i: vid.i, results: vid.results.map((r) => (r ? { pct: r.pct } : null)) })); } catch (e) { /* ignore */ } }
+  function offerResume() {
+    let v = null; try { v = JSON.parse(localStorage.getItem(VIDEO_KEY) || 'null'); } catch (e) { /* ignore */ }
+    if (!v || !v.sents || !v.sents.length) { $('vResume').innerHTML = ''; return; }
+    $('vResume').innerHTML = `Last video: <b>${esc(v.title)}</b> (sentence ${v.i + 1} of ${v.sents.length}). <button type="button" class="btn ghost small" id="vGoOn">Continue</button>`;
+    $('vGoOn').onclick = () => startVideo(v);
+  }
+
+  // ---- one sentence ----
+  function showSentence() {
+    const s = vid.sents[vid.i];
+    $('vProgress').textContent = `Sentence ${vid.i + 1} of ${vid.sents.length}`;
+    $('vBar').style.width = Math.round((vid.results.filter(Boolean).length / vid.sents.length) * 100) + '%';
+    $('vShow').innerHTML = sentenceHtml(s.text);
+    $('vTune').innerHTML = `${expectedTune(s.text).why} <b>Bold</b> words carry the stress.`;
+    $('vNotes').innerHTML = speechNotes(s.text).map((n) => `<li>${n}</li>`).join('');
+    const r = vid.results[vid.i];
+    $('vResult').innerHTML = r && r.html ? r.html : '';
+    $('vMine').classList.toggle('hidden', !(r && r.audio));
+    $('vStatus').textContent = '';
+    $('vPrev').disabled = vid.i === 0; $('vNext').disabled = vid.i >= vid.sents.length - 1;
+    const f = findSentence(s.text);
+    $('vFav').textContent = f && f.fav ? '★ In favorites' : '☆ Add to favorites';
+    $('vFav').classList.toggle('on-fav', !!(f && f.fav));
+    renderVideoList();
+  }
+  function renderVideoList() {
+    $('vTable').querySelector('tbody').innerHTML = vid.sents.map((s, k) => {
+      const r = vid.results[k], v = r ? (r.pct === null ? 'skipped' : r.pct + '%') : '';
+      const cls = !r || r.pct === null ? 'muted' : r.pct >= 80 ? 'acc-good' : 'acc-bad';
+      return `<tr data-k="${k}" class="${k === vid.i ? 'sel' : ''}"><td>${k + 1}</td><td class="muted">${mmss(s.start)}</td><td class="s-text">${esc(s.text)}</td><td class="${cls}">${v}</td></tr>`;
+    }).join('');
+    const sel = $('vTable').querySelector('tr.sel');
+    if (sel) { const box = sel.closest('.v-list'); box.scrollTop = Math.max(0, sel.offsetTop - box.clientHeight / 2); }
+  }
+  function goTo(k) { if (vid.busy) cancelTry(); vid.i = Math.max(0, Math.min(vid.sents.length - 1, k)); saveVideo(); showSentence(); }
+  function cancelTry() { vid.stop = true; if (mic) mic.stop(); if (yt && yt.pauseVideo) yt.pauseVideo(); }
+  $('vPrev').addEventListener('click', () => goTo(vid.i - 1));
+  $('vNext').addEventListener('click', () => goTo(vid.i + 1));
+  $('vPlay').addEventListener('click', async () => { if (vid.busy) return; const s = vid.sents[vid.i]; vid.stop = false; await playPart(s.start, s.end); });
+  $('vTable').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-k]'); if (tr) goTo(+tr.dataset.k); });
+  $('vChange').addEventListener('click', () => { cancelTry(); $('vRun').classList.add('hidden'); $('vSetup').classList.remove('hidden'); offerResume(); });
+  $('vMine').addEventListener('click', () => playAudio((vid.results[vid.i] || {}).audio));
+  $('vDoneSpeak').addEventListener('click', () => { if (mic) mic.stop(); });
+  $('vSlow').addEventListener('change', () => { if (yt && yt.setPlaybackRate) yt.setPlaybackRate($('vSlow').checked ? 0.75 : 1); });
+  $('vFav').addEventListener('click', () => {
+    const text = vid.sents[vid.i].text;
+    let s = findSentence(text);
+    if (!s) { s = { id: uid(), text, added: todayKey(), tries: 0, best: 0, last: null }; db.sentences.push(s); day().newWords++; }
+    s.fav = !s.fav; save(); updateChip(); showSentence();
+  });
+
+  // Play the sentence, record the learner, score; with "Go on by itself", continue with the next one.
+  $('vGo').addEventListener('click', async () => {
+    if (vid.busy) { cancelTry(); return; }
+    if (!SR && !canRecord) { $('vStatus').textContent = 'Recording is not supported in this browser. Try Chrome or Edge.'; return; }
+    vid.busy = true; vid.stop = false;
+    const go = $('vGo');
+    go.classList.add('on');
+    try {
+      do {
+        const k = vid.i, s = vid.sents[k];
+        $('vResult').innerHTML = ''; $('vMine').classList.add('hidden');
+        go.textContent = '👂 Listen… (click to stop)'; $('vStatus').textContent = 'Listen to the speaker…';
+        if (!(await playPart(s.start, s.end))) break;
+        go.textContent = '🎙️ Your turn! (click to stop)'; $('vStatus').innerHTML = '<b>Your turn:</b> say it now, the same way.';
+        $('vDoneSpeak').classList.remove('hidden');
+        const r = await listenOnce(Math.max(3, (s.end - s.start) / ($('vSlow').checked ? 0.75 : 1)) * 2 + 4);
+        $('vDoneSpeak').classList.add('hidden');
+        if (vid.stop) break;
+        if (r.error && !r.heard && micMessage(r.error)) { $('vStatus').textContent = ''; $('vResult').innerHTML = `<p class="feedback wrong">${esc(micMessage(r.error))}</p>`; break; }
+        $('vStatus').textContent = 'Checking…';
+        let a = null;
+        if (r.audio) { try { a = await analyse(r.audio); } catch (err) { console.warn('Analysis failed', err); } }
+        const res = await scoreTry(findSentence(s.text) || { text: s.text }, r.heard, a, !!SR);
+        vid.results[k] = { pct: res.pct, audio: r.audio, html: res.html };
+        saveVideo();
+        $('vStatus').textContent = '';
+        $('vResult').innerHTML = res.html;
+        $('vMine').classList.toggle('hidden', !r.audio);
+        renderVideoList();
+        $('vBar').style.width = Math.round((vid.results.filter(Boolean).length / vid.sents.length) * 100) + '%';
+        if (!$('vOn').checked || vid.i >= vid.sents.length - 1) break;
+        for (let n = 4; n > 0 && !vid.stop; n--) { $('vStatus').innerHTML = `Next sentence in <b>${n}</b>… (click the green button to stop)`; await new Promise((res2) => setTimeout(res2, 1000)); }
+        if (vid.stop) break;
+        vid.i++; saveVideo(); showSentence();
+      } while (!vid.stop);
+    } finally {
+      vid.busy = false; vid.stop = false;
+      go.classList.remove('on'); go.textContent = '🔁 Play, then repeat';
+      $('vDoneSpeak').classList.add('hidden');
+      if (/Next sentence in|Listen to|Your turn/.test($('vStatus').textContent)) $('vStatus').textContent = '';
+      flushCloud();
+    }
+  });
+
   // ---------- my sentences ----------
   function showTab(name) {
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
     document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
     if (name === 'list') renderList();
     if (name === 'fav') renderFav();
+    if (name === 'video' && !vid.sents.length) offerResume();
+    if (name !== 'video' && vid.busy) cancelTry();
     if (name === 'text') updateTextCount();
   }
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));

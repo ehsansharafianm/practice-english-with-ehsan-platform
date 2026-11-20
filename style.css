@@ -475,3 +475,16 @@ code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: .
 .score-rows tr.open td { border-bottom-color: transparent; }
 .score-rows tr.row-detail > td { background: var(--bg); border-radius: 0 0 10px 10px; padding: 8px 12px 12px; cursor: default; }
 .score-rows tr.row-detail .pscore { margin-top: 4px; }
+
+/* Shadow a video */
+.video-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000; margin-top: 10px; }
+.video-wrap iframe, .video-wrap > div { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.v-title { margin: 0; font-size: 1.05rem; min-width: 0; overflow-wrap: anywhere; }
+.v-list { max-height: 320px; overflow-y: auto; }
+.cs-notes { margin: 0 0 10px; padding-left: 20px; color: var(--text); font-size: .92rem; }
+.cs-notes li { margin: 3px 0; }
+.cs-notes .say { font-style: italic; color: var(--accent); }
+.paste-box { margin-top: 6px; }
+.paste-box summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+#vPaste { display: block; width: 100%; padding: 12px 14px; font: inherit; resize: vertical; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); }
+#vLink { padding: 10px 14px; font: inherit; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--text); }

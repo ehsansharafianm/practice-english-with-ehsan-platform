@@ -27,6 +27,9 @@ tools/build_pron.py  Builds pronunciation/data from the CMU Pronouncing Dictiona
 shadowing/        Shadowing Practice
   index.html
   app.js
+worker/           Caption helper for "Shadow a video" (Cloudflare Worker)
+  src/index.js
+  wrangler.toml
 ```
 
 Each new practice tool gets its own folder, a card on the home page, and an entry in the `PAGES` list in `site.js`.
@@ -114,7 +117,24 @@ Signed-in students' pronunciation data is saved in the `pron` field of their `us
 - **⭐ Favorites** – the learner's own favorite sentences. Paste them one per line, or click ☆ next to any sentence
   (in My sentences or on the shadowing card). "Practise my favorites" goes through them, weakest first.
   Stored as `fav: true` on the sentence, so favorites are saved to the account too.
+- **Shadow a video** – paste a YouTube link. The caption helper (`worker/`) gets the video's English captions with
+  their times; the page cuts them into sentences, plays each one from the video (YouTube player), records the learner
+  and scores the try. Each sentence shows its melody, stressed words and connected-speech notes (wanna, American T,
+  linking, weak forms). If the helper cannot get the captions, the learner pastes YouTube's "Show transcript" text instead.
 - Signed-in students' data is saved in the `shad` field of their `users/{uid}` document.
+
+## Caption helper (worker/)
+
+A small Cloudflare Worker (free plan) at https://pewe-captions.practice-english-ehsan.workers.dev.
+`GET /captions?v=<YouTube link or id>` answers with the captions as JSON. It only answers this site and localhost.
+It uses YouTube's unofficial player address, so it can stop working if YouTube changes it; the page then asks for the transcript.
+
+```
+cd worker
+npm install
+npm run dev      # local helper on http://127.0.0.1:8787 (used by the page on localhost)
+npx wrangler deploy   # publish changes (after `npx wrangler login`)
+```
 
 ## Run locally
 

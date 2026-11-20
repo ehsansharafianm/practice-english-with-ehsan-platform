@@ -6,7 +6,7 @@
   <title>Shadowing Practice</title>
   <meta name="description" content="Sentence shadowing with American intonation — Practice English with Ehsan Platform">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../style.css?v=20261119f">
+  <link rel="stylesheet" href="../style.css?v=20261120a">
   <script src="../site.js?v=20261119f"></script>
 </head>
 <body>
@@ -23,6 +23,7 @@
   <nav class="tabs" role="tablist">
     <button class="tab active" data-tab="practise" role="tab">Shadow a sentence</button>
     <button class="tab" data-tab="text" role="tab">Shadow a text</button>
+    <button class="tab" data-tab="video" role="tab">Shadow a video</button>
     <button class="tab" data-tab="list" role="tab">My sentences</button>
     <button class="tab" data-tab="fav" role="tab">⭐ Favorites</button>
   </nav>
@@ -132,6 +133,64 @@
       </div>
     </section>
 
+    <!-- ============ SHADOW A VIDEO ============ -->
+    <section id="tab-video" class="panel">
+      <div id="vSetup" class="card">
+        <h2>Shadow a YouTube video</h2>
+        <p class="hint">Paste a link to a YouTube video in English. The page finds its sentences, plays them one by one in the speaker's real voice,
+          and you repeat each one. Videos need English captions (most have at least automatic ones).</p>
+        <form id="vForm" class="row" style="margin-top:0" autocomplete="off">
+          <input id="vLink" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" aria-label="YouTube link" style="flex:1; min-width:220px; margin-top:0">
+          <button id="vLoad" class="btn primary" type="submit">Load video</button>
+        </form>
+        <p id="vMsg" class="hint" aria-live="polite"></p>
+        <details id="vPasteBox" class="paste-box">
+          <summary>Or paste the transcript yourself</summary>
+          <p class="hint">On YouTube, open the video, click <b>…more</b> under it, then <b>Show transcript</b>. Select all the lines (with their times),
+            copy them and paste them here. Also paste the video link above.</p>
+          <textarea id="vPaste" rows="6" maxlength="200000" placeholder="0:12&#10;So in college,&#10;0:15&#10;I was a government major,"></textarea>
+          <div class="row"><button id="vUsePaste" class="btn ghost" type="button">Use this transcript</button></div>
+        </details>
+        <p class="hint" id="vResume"></p>
+      </div>
+
+      <div id="vRun" class="card hidden">
+        <div class="run-head">
+          <h2 id="vTitle" class="v-title"></h2>
+          <button id="vChange" class="btn ghost small" type="button">Another video</button>
+        </div>
+        <div class="video-wrap"><div id="vPlayer"></div></div>
+        <div class="run-head" style="margin-top:12px">
+          <span id="vProgress" class="counter"></span>
+          <span id="vAuto" class="muted"></span>
+        </div>
+        <div class="progress"><div id="vBar" class="bar"></div></div>
+        <div id="vShow" class="s-show" style="margin-top:12px"></div>
+        <p id="vTune" class="hint"></p>
+        <ul id="vNotes" class="cs-notes"></ul>
+        <div class="row center"><button id="vGo" class="btn mic-btn big-go" type="button">🔁 Play, then repeat</button></div>
+        <div class="row center" style="margin-top:4px"><button id="vDoneSpeak" class="btn mic-btn hidden" type="button">✓ Done speaking</button></div>
+        <p id="vStatus" class="s-status center" aria-live="polite"></p>
+        <div id="vResult" aria-live="polite"></div>
+        <div class="row">
+          <button id="vPrev" class="btn ghost" type="button">⏮ Previous</button>
+          <button id="vPlay" class="btn ghost" type="button">▶ Play sentence</button>
+          <button id="vNext" class="btn ghost" type="button">Next ⏭</button>
+          <button id="vMine" class="btn ghost hidden" type="button">🎧 My voice</button>
+          <button id="vFav" class="btn ghost" type="button">☆ Add to favorites</button>
+        </div>
+        <div class="row" style="align-items:center">
+          <label class="check slow-check"><input type="checkbox" id="vSlow"> 🐢 Slow (0.75×)</label>
+          <label class="check slow-check"><input type="checkbox" id="vOn"> Go on to the next sentence by itself</label>
+        </div>
+        <h3 class="sub-h">Sentences</h3>
+        <div class="table-wrap v-list">
+          <table id="vTable" class="click-rows score-rows"><thead><tr><th>#</th><th>Time</th><th>Sentence</th><th>Match</th></tr></thead><tbody></tbody></table>
+        </div>
+        <p class="hint">Click a sentence to go to it.</p>
+      </div>
+    </section>
+
     <!-- ============ MY SENTENCES ============ -->
     <section id="tab-list" class="panel">
       <div class="card">
@@ -192,7 +251,7 @@
   </main>
 
   <footer class="foot"><a class="home-link" href="../">Practice English with Ehsan Platform</a> · Shadowing Practice</footer>
-  <script src="app.js?v=20261119b"></script>
+  <script src="app.js?v=20261120a"></script>
   <script type="module" src="../account.js?v=20261118b"></script>
 </body>
 </html>
