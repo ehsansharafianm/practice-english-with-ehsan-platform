@@ -4,6 +4,7 @@
  * sentence (pitch from the recording), how lively the voice is, and the speed. Everything except the
  * speech recognition runs in the browser.
  * Guests: saved in this browser. Signed-in students: also saved to their account (field "shad").
+ * A sentence with fav: true is one of the learner's favorites (the ⭐ Favorites tab).
  */
 (() => {
   'use strict';
@@ -42,7 +43,7 @@
     (b.sentences || []).forEach((s) => {
       const x = out.sentences.find((y) => key(y.text) === key(s.text));
       if (!x) out.sentences.push({ ...s });
-      else { x.tries = Math.max(x.tries || 0, s.tries || 0); x.best = Math.max(x.best || 0, s.best || 0); if ((s.lastAt || 0) > (x.lastAt || 0)) { x.last = s.last; x.lastAt = s.lastAt; } }
+      else { if (s.fav) x.fav = true; x.tries = Math.max(x.tries || 0, s.tries || 0); x.best = Math.max(x.best || 0, s.best || 0); if ((s.lastAt || 0) > (x.lastAt || 0)) { x.last = s.last; x.lastAt = s.lastAt; } }
     });
     Object.entries(b.days || {}).forEach(([k, v]) => {
       const d = out.days[k] || (out.days[k] = {});
@@ -265,6 +266,7 @@
     $('sResult').innerHTML = ''; $('sStatus').textContent = '';
     $('sMine').classList.add('hidden');
     $('sNext').classList.toggle('hidden', !queue.length);
+    favButton();
     fillVoices();
     $('shadow').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -313,6 +315,19 @@
   let audioEl = null;
   $('sMine').addEventListener('click', () => { if (!lastAudio) return; if (audioEl) audioEl.pause(); audioEl = new Audio(lastAudio); audioEl.play().catch(() => {}); });
   $('sNext').addEventListener('click', () => { const s = queue.shift(); if (s) open(s, { fromQueue: true }); });
+  // ☆ / ★ on the shadowing card. The sentence must be in My sentences to be a favorite.
+  function favButton() {
+    const on = !!(cur && cur.fav);
+    $('sFav').textContent = on ? '★ In favorites' : '☆ Add to favorites';
+    $('sFav').classList.toggle('on-fav', on);
+  }
+  $('sFav').addEventListener('click', () => {
+    if (!cur) return;
+    let s = findSentence(cur.text);
+    if (!s) { s = { id: uid(), text: cur.text, added: todayKey(), tries: 0, best: 0, last: null }; db.sentences.push(s); day().newWords++; }
+    s.fav = !s.fav; cur = s;
+    save(); favButton();
+  });
 
   // ---------- comparing the words ----------
   const NUM = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
@@ -764,6 +779,7 @@
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
     document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
     if (name === 'list') renderList();
+    if (name === 'fav') renderFav();
     if (name === 'text') updateTextCount();
   }
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
@@ -776,7 +792,7 @@
     const cell = (v) => (v === null || v === undefined || (!v && v !== 0) ? '<td class="muted">–</td>' : `<td class="${v >= 80 ? 'acc-good' : 'acc-bad'}">${v}%</td>`);
     $('lTable').querySelector('tbody').innerHTML = list.map((s) => `<tr data-id="${esc(s.id)}" tabindex="0"><td><div class="w s-text">${esc(s.text)}</div></td>
       ${s.tries ? cell(s.best) : '<td class="muted">–</td>'}${s.tries ? cell(s.last) : '<td class="muted">–</td>'}<td>${s.tries || 0}</td>
-      <td><button class="del" type="button" data-del="${esc(s.id)}" title="Delete">✕</button></td></tr>`).join('');
+      <td class="nowrap">${starBtn(s)}<button class="del" type="button" data-del="${esc(s.id)}" title="Delete">✕</button></td></tr>`).join('');
     const d = db.days[todayKey()] || {};
     $('tScore').textContent = d.score || 0;
     $('tAvg').textContent = d.tries ? Math.round((d.sum || 0) / d.tries) + '%' : '–';
@@ -785,6 +801,7 @@
   }
   $('lSearch').addEventListener('input', renderList);
   $('lTable').addEventListener('click', (e) => {
+    if (toggleStar(e)) { renderList(); return; }
     const del = e.target.closest('[data-del]');
     if (del) {
       const s = db.sentences.find((x) => x.id === del.dataset.del);
@@ -803,7 +820,65 @@
     open(first, { fromQueue: true });
   });
 
-  function refresh() { updateChip(); if ($('tab-list').classList.contains('active')) renderList(); }
+  // ---------- favorites ----------
+  const starBtn = (s) => `<button class="star${s.fav ? ' on' : ''}" type="button" data-star="${esc(s.id)}" title="${s.fav ? 'Remove from favorites' : 'Add to favorites'}" aria-pressed="${!!s.fav}">${s.fav ? '★' : '☆'}</button>`;
+  // Handles a click on a ☆/★ button in a table. Returns true when it was one.
+  function toggleStar(e) {
+    const b = e.target.closest('[data-star]');
+    if (!b) return false;
+    const s = db.sentences.find((x) => x.id === b.dataset.star);
+    if (s) { s.fav = !s.fav; save(); if (cur === s) favButton(); }
+    return true;
+  }
+  const favs = () => db.sentences.filter((s) => s.fav);
+  function renderFav() {
+    const q = key($('fSearch').value), all = favs();
+    // keep the order they were added in, so the learner's own list stays as they wrote it
+    const list = all.filter((s) => !q || key(s.text).includes(q));
+    $('fCount').textContent = `(${all.length})`;
+    $('fEmpty').classList.toggle('hidden', all.length > 0);
+    $('fPractise').classList.toggle('hidden', !all.length);
+    const cell = (s, v) => (!s.tries || v === null || v === undefined ? '<td class="muted">–</td>' : `<td class="${v >= 80 ? 'acc-good' : 'acc-bad'}">${v}%</td>`);
+    $('fTable').querySelector('tbody').innerHTML = list.map((s) => `<tr data-id="${esc(s.id)}" tabindex="0"><td><div class="w s-text">${esc(s.text)}</div></td>
+      ${cell(s, s.best)}${cell(s, s.last)}<td>${s.tries || 0}</td><td>${starBtn(s)}</td></tr>`).join('');
+  }
+  $('fSearch').addEventListener('input', renderFav);
+  $('fAdd').addEventListener('click', () => {
+    // one sentence per line; a line with several sentences or more than 20 words is split
+    const parts = $('fText').value.replace(/\r/g, '').split('\n').flatMap((line) => splitText(line)).map(tidy).filter((t) => wordsOf(t).length >= 2);
+    if (!parts.length) { $('fMsg').textContent = 'Please type or paste at least one sentence (two words or more).'; return; }
+    let added = 0, already = 0;
+    parts.forEach((text) => {
+      let s = findSentence(text);
+      if (!s) { s = { id: uid(), text, added: todayKey(), tries: 0, best: 0, last: null }; db.sentences.push(s); day().newWords++; }
+      if (s.fav) already++; else { s.fav = true; added++; }
+    });
+    save(); updateChip();
+    $('fText').value = '';
+    $('fMsg').textContent = `Added ${added} sentence${added === 1 ? '' : 's'} to your favorites.` + (already ? ` ${already} ${already === 1 ? 'was' : 'were'} already there.` : '');
+    renderFav();
+  });
+  $('fTable').addEventListener('click', (e) => {
+    if (toggleStar(e)) { renderFav(); return; }
+    const tr = e.target.closest('tr[data-id]');
+    if (tr) { const s = db.sentences.find((x) => x.id === tr.dataset.id); if (s) { showTab('practise'); $('sText').value = s.text; countWords(); open(s); } }
+  });
+  $('fTable').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('tr[data-id]')) e.target.click(); });
+  $('fPractise').addEventListener('click', () => {
+    const all = favs();
+    if (!all.length) return;
+    queue = all.map((s) => ({ s, k: (s.tries ? (s.best || 0) / 100 : -1) + Math.random() * 0.3 })).sort((a, b) => a.k - b.k).map((x) => x.s);
+    const first = queue.shift();
+    showTab('practise'); $('sText').value = first.text; countWords();
+    open(first, { fromQueue: true });
+  });
+
+  function refresh() {
+    updateChip();
+    if ($('tab-list').classList.contains('active')) renderList();
+    if ($('tab-fav').classList.contains('active')) renderFav();
+    if (cur) { cur = findSentence(cur.text) || cur; favButton(); }
+  }
   if (!SR) $('sSay').classList.add('hidden');
   fillVoices();
   countWords();

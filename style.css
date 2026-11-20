@@ -240,6 +240,10 @@ td .n { color: var(--muted); font-size: .85rem; }
 .acc-bad { color: var(--bad); font-weight: 600; }
 .del { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; }
 .del:hover { color: var(--bad); }
+.star { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 1.15rem; padding: 0 4px; line-height: 1; }
+.star:hover, .star.on { color: #e0a800; }
+.nowrap { white-space: nowrap; }
+.btn.on-fav { color: #b88a00; border-color: #e0a800; }
 .file-btn { display: inline-block; font-weight: 400; margin: 0; }
 
 .history { display: grid; gap: 6px; }
@@ -447,7 +451,7 @@ code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: .
 .contour .c-head { fill: var(--bad); }
 .contour .c-head.ok { fill: var(--good); }
 .s-text { font-weight: 500; }
-#tText { display: block; width: 100%; padding: 12px 14px; font: inherit; resize: vertical; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); }
+#tText, #fText { display: block; width: 100%; padding: 12px 14px; font: inherit; resize: vertical; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); }
 #tTable td:first-child { color: var(--muted); width: 2.5em; }
 .score-rows .row-acts { white-space: nowrap; text-align: right; }
 .score-rows .row-acts .btn { padding: 4px 8px; margin-left: 2px; }

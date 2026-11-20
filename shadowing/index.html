@@ -6,7 +6,7 @@
   <title>Shadowing Practice</title>
   <meta name="description" content="Sentence shadowing with American intonation — Practice English with Ehsan Platform">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../style.css?v=20261118b">
+  <link rel="stylesheet" href="../style.css?v=20261119b">
   <script src="../site.js?v=20261118b"></script>
 </head>
 <body>
@@ -24,6 +24,7 @@
     <button class="tab active" data-tab="practise" role="tab">Shadow a sentence</button>
     <button class="tab" data-tab="text" role="tab">Shadow a text</button>
     <button class="tab" data-tab="list" role="tab">My sentences</button>
+    <button class="tab" data-tab="fav" role="tab">⭐ Favorites</button>
   </nav>
 
   <main>
@@ -64,6 +65,7 @@
         <div id="sResult" aria-live="polite"></div>
         <div class="row">
           <button id="sMine" class="btn ghost small hidden" type="button">▶ My voice</button>
+          <button id="sFav" class="btn ghost small" type="button">☆ Add to favorites</button>
           <button id="sNext" class="btn ghost small hidden" type="button">Next sentence ›</button>
         </div>
       </div>
@@ -158,10 +160,39 @@
         <p class="hint">A try with a match of 80% or more = 10 points.</p>
       </div>
     </section>
+
+    <!-- ============ FAVORITES ============ -->
+    <section id="tab-fav" class="panel">
+      <div class="card">
+        <h2>Add favorite sentences</h2>
+        <p class="hint">Bring the sentences you love and want to say perfectly. Put <b>one sentence on each line</b>.
+          Sentences longer than 20 words are cut into shorter parts.</p>
+        <textarea id="fText" rows="5" maxlength="6000" placeholder="e.g.&#10;I'd rather be safe than sorry.&#10;Could you give me a hand with this?"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button id="fAdd" class="btn primary" type="button">⭐ Add to favorites</button>
+        </div>
+        <p id="fMsg" class="hint" aria-live="polite"></p>
+      </div>
+      <div class="card">
+        <div class="lib-head">
+          <h2>My favorite sentences <span id="fCount" class="muted"></span></h2>
+          <input id="fSearch" type="search" placeholder="Search…">
+        </div>
+        <div id="fEmpty" class="empty hidden">No favorites yet. Add your sentences above, or click ☆ next to any sentence in “My sentences”.</div>
+        <div class="table-wrap">
+          <table id="fTable" class="click-rows">
+            <thead><tr><th>Sentence</th><th>Best</th><th>Last</th><th>Tries</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="row"><button id="fPractise" class="btn primary" type="button">Practise my favorites</button></div>
+        <p class="hint">Click a sentence to shadow it. "Practise my favorites" goes through all of them, weakest first. ★ removes a sentence from favorites (it stays in My sentences).</p>
+      </div>
+    </section>
   </main>
 
   <footer class="foot"><a class="home-link" href="../">Practice English with Ehsan Platform</a> · Shadowing Practice</footer>
-  <script src="app.js?v=20261118b"></script>
+  <script src="app.js?v=20261119a"></script>
   <script type="module" src="../account.js?v=20261118b"></script>
 </body>
 </html>

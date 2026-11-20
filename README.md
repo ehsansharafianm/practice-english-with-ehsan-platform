@@ -111,6 +111,9 @@ Signed-in students' pronunciation data is saved in the `pron` field of their `us
   recording. Each sentence row has ▶ (voice), 🎧 (your voice) and 🔁 (practise it again); click a row to open its
   analysis and melody chart. At the end: average, score per sentence, and "practise the sentences under 80% again". Up to 60 sentences.
 - **My sentences** – best and last score per sentence; "Practise my sentences" starts with the weakest.
+- **⭐ Favorites** – the learner's own favorite sentences. Paste them one per line, or click ☆ next to any sentence
+  (in My sentences or on the shadowing card). "Practise my favorites" goes through them, weakest first.
+  Stored as `fav: true` on the sentence, so favorites are saved to the account too.
 - Signed-in students' data is saved in the `shad` field of their `users/{uid}` document.
 
 ## Run locally
