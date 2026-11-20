@@ -6,7 +6,7 @@
   <title>Shadowing Practice</title>
   <meta name="description" content="Sentence shadowing with American intonation — Practice English with Ehsan Platform">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../style.css?v=20261120m">
+  <link rel="stylesheet" href="../style.css?v=20261120v">
   <script src="../site.js?v=20261119f"></script>
 </head>
 <body>
@@ -154,10 +154,20 @@
         <p class="hint" id="vResume"></p>
       </div>
 
+      <div id="vLib" class="card hidden">
+        <h2>My videos <span id="vLibCount" class="muted"></span></h2>
+        <p class="hint">The videos you practised are kept here with your place and scores. <b>Continue</b> where you stopped,
+          or <b>Start over</b> to practise the whole video again (your best round is kept).</p>
+        <div id="vLibList" class="vl-list"></div>
+      </div>
+
       <div id="vRun" class="card hidden">
         <div class="run-head">
           <h2 id="vTitle" class="v-title"></h2>
-          <button id="vChange" class="btn ghost small" type="button">Another video</button>
+          <span class="nowrap">
+            <button id="vRestart" class="btn ghost small" type="button" title="Clear the scores and practise this video again from the start">🔄 Start over</button>
+            <button id="vChange" class="btn ghost small" type="button">My videos</button>
+          </span>
         </div>
         <div class="video-wrap"><div id="vPlayer"></div></div>
         <div class="run-head" style="margin-top:12px">
@@ -253,7 +263,7 @@
   </main>
 
   <footer class="foot"><a class="home-link" href="../">Practice English with Ehsan Platform</a> · Shadowing Practice</footer>
-  <script src="app.js?v=20261120g"></script>
-  <script type="module" src="../account.js?v=20261118b"></script>
+  <script src="app.js?v=20261120v"></script>
+  <script type="module" src="../account.js?v=20261120v"></script>
 </body>
 </html>

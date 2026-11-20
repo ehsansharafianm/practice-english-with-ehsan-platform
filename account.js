@@ -67,7 +67,7 @@ async function start() {
   // Shadowing Practice keeps its sentences and daily scores in the "shad" field.
   api.saveShad = async (d) => {
     if (!api.user) return;
-    const clean = JSON.parse(JSON.stringify({ sentences: d.sentences || [], days: d.days || {} }));
+    const clean = JSON.parse(JSON.stringify({ sentences: d.sentences || [], days: d.days || {}, videos: d.videos || [] }));
     await F.setDoc(userDoc(), { name: displayName(), email: api.user.email || '', lastActive: F.serverTimestamp(), shad: clean }, { merge: true });
   };
   api.listStudents = async () => {

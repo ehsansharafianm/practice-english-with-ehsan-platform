@@ -32,6 +32,7 @@ It is one of the fastest ways to sound natural, and now you can do it with **any
 3. **Repeat it.** The page records you and gives you a score for your words, your speed and your melody.
 4. **Compare.** Play the speaker and your own voice side by side, as many times as you want.
 5. **Keep going.** Turn on *Go on by itself* and shadow a whole talk, sentence after sentence.
+6. **Come back to it.** *My videos* keeps every video you practised, with your place and scores. Continue where you stopped, jump to your weak sentences, or start over for a new round.
 
 <p align="center">
   <img src="docs/images/shadow-video.png" alt="Shadowing a TED talk sentence by sentence" width="820">
@@ -208,6 +209,8 @@ Signed-in students' pronunciation data is saved in the `pron` field of their `us
   their times; the page cuts them into sentences, plays each one from the video (YouTube player), records the learner
   and scores the try. Each sentence shows its melody, stressed words and connected-speech notes (wanna, American T,
   linking, weak forms). If the helper cannot get the captions, the learner pastes YouTube's "Show transcript" text instead.
+  *My videos* keeps the last 15 videos (`shad.videos`: id, title, sentences with times, current place, a score per sentence,
+  round number and best round) so a student can continue, practise the weak sentences, or start over.
 - Signed-in students' data is saved in the `shad` field of their `users/{uid}` document.
 
 ## Caption helper (worker/)

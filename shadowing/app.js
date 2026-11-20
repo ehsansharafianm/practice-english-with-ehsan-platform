@@ -23,8 +23,8 @@
 
   // ---------- storage ----------
   function load(key = storeKey) {
-    try { const d = JSON.parse(localStorage.getItem(key) || 'null'); if (d) return { sentences: d.sentences || [], days: d.days || {} }; } catch (e) { /* ignore */ }
-    return { sentences: [], days: {} };
+    try { const d = JSON.parse(localStorage.getItem(key) || 'null'); if (d) return { sentences: d.sentences || [], days: d.days || {}, videos: d.videos || [] }; } catch (e) { /* ignore */ }
+    return { sentences: [], days: {}, videos: [] };
   }
   let db = load();
   let cloudTimer = null;
@@ -39,7 +39,13 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudTimer) flushCloud(); });
   const key = (t) => clean(t).toLowerCase().replace(/[^a-z0-9' ]/g, '');
   function merge(a, b) {
-    const out = { sentences: (a.sentences || []).map((s) => ({ ...s })), days: JSON.parse(JSON.stringify(a.days || {})) };
+    const out = { sentences: (a.sentences || []).map((s) => ({ ...s })), days: JSON.parse(JSON.stringify(a.days || {})), videos: (a.videos || []).map((v) => ({ ...v })) };
+    // videos: the same video in both keeps the one practised last
+    (b.videos || []).forEach((v) => {
+      const k = out.videos.findIndex((x) => x.id === v.id);
+      if (k < 0) out.videos.push({ ...v });
+      else if ((v.at || 0) > (out.videos[k].at || 0)) out.videos[k] = { ...v };
+    });
     (b.sentences || []).forEach((s) => {
       const x = out.sentences.find((y) => key(y.text) === key(s.text));
       if (!x) out.sentences.push({ ...s });
@@ -58,7 +64,7 @@
       storeKey = STORE_KEY + ':' + user.uid;
       let cloud = null;
       try { cloud = await window.PEWE.load(); cloudOK = true; } catch (err) { console.warn('Could not load account data', err); }
-      db = merge(merge((cloud && cloud.shad) || { sentences: [], days: {} }, load(storeKey)), load(STORE_KEY));
+      db = merge(merge((cloud && cloud.shad) || { sentences: [], days: {}, videos: [] }, load(storeKey)), load(STORE_KEY));
       try { localStorage.removeItem(STORE_KEY); } catch (err) { /* ignore */ }
       save();
       if (cloudOK) flushCloud();
@@ -976,6 +982,8 @@
     e.preventDefault();
     const id = ytId($('vLink').value);
     if (!id) return vMsg('Please paste a YouTube link, for example https://www.youtube.com/watch?v=…');
+    const known = videoById(id);
+    if (known) { $('vLink').value = ''; return startVideo(known); }
     if (!CAPTIONS_API) { $('vPasteBox').open = true; return vMsg('Finding the captions by link is not switched on yet. Please paste the transcript below.'); }
     $('vLoad').disabled = true; vMsg('Finding the sentences…');
     let data = null;
@@ -996,26 +1004,106 @@
     if (!id) return vMsg('Please paste the video link in the box above too, so the page can play the video.');
     const pieces = parseTranscript($('vPaste').value);
     if (pieces.length < 2) return vMsg('I could not find times in this transcript. Copy it from YouTube\'s “Show transcript” panel, with the times (like 0:12).');
-    startVideo({ id, title: '', auto: false, sents: buildSentences(pieces) });
+    const known = videoById(id);
+    startVideo({ id, title: known ? known.title : '', auto: false, sents: buildSentences(pieces), added: known && known.added, rounds: known ? known.rounds : 1, bestAvg: known ? known.bestAvg : null });
   });
-  async function startVideo({ id, title, auto, sents, i = 0, results = [] }) {
+  async function startVideo({ id, title, auto, sents, i = 0, results = [], added, rounds = 1, bestAvg = null }) {
     if (!sents.length) return vMsg('I could not find any sentences in this video.');
-    Object.assign(vid, { id, title: title || 'YouTube video', auto, sents, i: Math.min(i, sents.length - 1), results, stop: false });
+    Object.assign(vid, { id, title: title || 'YouTube video', auto, sents, i: Math.max(0, Math.min(i, sents.length - 1)), results: results.slice(), stop: false,
+      added: added || todayKey(), rounds, bestAvg });
     vMsg('');
-    $('vSetup').classList.add('hidden'); $('vRun').classList.remove('hidden');
+    $('vSetup').classList.add('hidden'); $('vLib').classList.add('hidden'); $('vRun').classList.remove('hidden');
     $('vTitle').textContent = vid.title;
     $('vAuto').textContent = `${sents.length} sentences${auto ? ' · automatic captions, some words may be wrong' : ''}`;
     saveVideo();
     showSentence();
-    try { await makePlayer(id); } catch (err) { $('vStatus').textContent = 'The YouTube player could not load. Check your internet connection.'; }
+    try { await makePlayer(id); } catch (err) { $('vStatus').textContent = 'The YouTube player could not load. Check your internet connection.'; return; }
+    // a pasted transcript has no title: take the real one from the player
+    if (vid.title === 'YouTube video') {
+      const takeTitle = () => {
+        try { const t = yt.getVideoData && yt.getVideoData().title; if (t && vid.id === id && vid.title === 'YouTube video') { vid.title = t; $('vTitle').textContent = t; saveVideo(); return true; } } catch (e) { /* ignore */ }
+        return false;
+      };
+      if (!takeTitle()) setTimeout(takeTitle, 2500);
+    }
   }
-  function saveVideo() { try { localStorage.setItem(VIDEO_KEY, JSON.stringify({ id: vid.id, title: vid.title, auto: vid.auto, sents: vid.sents, i: vid.i, results: vid.results.map((r) => (r ? { pct: r.pct } : null)) })); } catch (e) { /* ignore */ } }
-  function offerResume() {
+
+  // ---- My videos: every video is kept (with its sentences, place and scores) in the account ----
+  const MAX_VIDEOS = 15;
+  const r2 = (t) => Math.round(t * 100) / 100;
+  const avgOf = (results) => { const v = (results || []).filter((r) => r && r.pct !== null && r.pct !== undefined); return v.length ? Math.round(v.reduce((a, r) => a + r.pct, 0) / v.length) : null; };
+  function saveVideo() {
+    if (!vid.id || !vid.sents.length) return;
+    db.videos = db.videos || [];
+    const entry = {
+      id: vid.id, title: vid.title, auto: !!vid.auto, i: vid.i, at: Date.now(), added: vid.added || todayKey(),
+      rounds: vid.rounds || 1, bestAvg: vid.bestAvg ?? null,
+      sents: vid.sents.map((x) => ({ text: x.text, start: r2(x.start), end: r2(x.end) })),
+      results: vid.sents.map((x, k) => (vid.results[k] ? { pct: vid.results[k].pct ?? null } : null))
+    };
+    db.videos = [entry, ...db.videos.filter((v) => v.id !== vid.id)].slice(0, MAX_VIDEOS);
+    save();
+  }
+  // a video saved by the older version of this page (one video only) moves into the list
+  (function moveOldVideo() {
     let v = null; try { v = JSON.parse(localStorage.getItem(VIDEO_KEY) || 'null'); } catch (e) { /* ignore */ }
-    if (!v || !v.sents || !v.sents.length) { $('vResume').innerHTML = ''; return; }
-    $('vResume').innerHTML = `Last video: <b>${esc(v.title)}</b> (sentence ${v.i + 1} of ${v.sents.length}). <button type="button" class="btn ghost small" id="vGoOn">Continue</button>`;
-    $('vGoOn').onclick = () => startVideo(v);
+    if (v && v.id && v.sents && v.sents.length) {
+      db.videos = db.videos || [];
+      if (!db.videos.some((x) => x.id === v.id)) { db.videos.push({ ...v, at: 1, added: todayKey(), rounds: 1, bestAvg: null }); save(); }
+    }
+    try { localStorage.removeItem(VIDEO_KEY); } catch (e) { /* ignore */ }
+  })();
+  function videoById(id) { return (db.videos || []).find((v) => v.id === id); }
+  function renderVideoLib() {
+    const list = [...(db.videos || [])].sort((a, b) => (b.at || 0) - (a.at || 0));
+    $('vLib').classList.toggle('hidden', !list.length || !$('vRun').classList.contains('hidden'));
+    $('vLibCount').textContent = list.length ? `(${list.length})` : '';
+    $('vLibList').innerHTML = list.map((v) => {
+      const done = (v.results || []).filter(Boolean).length, n = v.sents.length, avg = avgOf(v.results);
+      const pct = Math.round((done / n) * 100), finished = done >= n;
+      const when = v.at > 1 ? new Date(v.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+      return `<div class="vl-item" data-id="${esc(v.id)}">
+        <img class="vl-thumb" src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt="" loading="lazy">
+        <div class="vl-main">
+          <div class="vl-title">${esc(v.title || 'YouTube video')}</div>
+          <div class="vl-meta muted">${finished ? '✓ Finished' : `Sentence ${Math.min(v.i + 1, n)} of ${n}`} · ${done} practised${avg !== null ? ` · average <b class="${avg >= 80 ? 'acc-good' : 'acc-bad'}">${avg}%</b>` : ''}${v.bestAvg != null ? ` · best round ${v.bestAvg}%` : ''}${(v.rounds || 1) > 1 ? ` · round ${v.rounds}` : ''}${when ? ` · ${when}` : ''}</div>
+          <div class="progress vl-bar"><div class="bar" style="width:${pct}%"></div></div>
+          <div class="row vl-acts">
+            <button type="button" class="btn primary small" data-vact="go">${finished ? '▶ Open' : done || v.i ? '▶ Continue' : '▶ Start'}</button>
+            <button type="button" class="btn ghost small" data-vact="new" title="Clear the scores and practise the whole video again">🔄 Start over</button>
+            ${done && avg !== null && v.results.some((r) => r && r.pct !== null && r.pct < 80) ? '<button type="button" class="btn ghost small" data-vact="weak" title="Go to the first sentence under 80%">🎯 Weak sentences</button>' : ''}
+            <button type="button" class="btn ghost small vl-del" data-vact="del" title="Remove this video from the list">✕</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
   }
+  // Start over: the scores are cleared, the round number goes up and the best round is kept.
+  function restartEntry(v) {
+    const avg = avgOf(v.results);
+    return { ...v, i: 0, results: [], rounds: (v.rounds || 1) + 1, bestAvg: avg !== null && (v.results || []).filter(Boolean).length >= v.sents.length / 2 ? Math.max(v.bestAvg ?? 0, avg) : v.bestAvg ?? null };
+  }
+  $('vLibList').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-vact]'), item = e.target.closest('.vl-item');
+    if (!item) return;
+    const v = videoById(item.dataset.id);
+    if (!v) return;
+    const act = btn ? btn.dataset.vact : (e.target.closest('.vl-thumb, .vl-title') ? 'go' : '');
+    if (act === 'go') startVideo(v);
+    else if (act === 'new') startVideo(restartEntry(v));
+    else if (act === 'weak') { const k = v.results.findIndex((r) => r && r.pct !== null && r.pct < 80); startVideo({ ...v, i: k < 0 ? v.i : k }); }
+    else if (act === 'del') {
+      if (btn.dataset.sure) { db.videos = db.videos.filter((x) => x.id !== v.id); save(); renderVideoLib(); }
+      else { btn.dataset.sure = '1'; btn.textContent = 'Remove?'; btn.classList.add('danger'); setTimeout(() => { if (btn.isConnected) { delete btn.dataset.sure; btn.textContent = '✕'; btn.classList.remove('danger'); } }, 3000); }
+    }
+  });
+  $('vRestart').addEventListener('click', () => {
+    cancelTry();
+    const v = restartEntry({ ...vid, results: vid.results.map((r) => (r ? { pct: r.pct } : null)) });
+    Object.assign(vid, { i: 0, results: [], rounds: v.rounds, bestAvg: v.bestAvg });
+    saveVideo(); showSentence(); $('vStatus').textContent = `Round ${vid.rounds}: all scores cleared. Start again from the first sentence.`;
+  });
+  function offerResume() { renderVideoLib(); }
 
   // ---- one sentence ----
   function showSentence() {
@@ -1078,7 +1166,7 @@
     if (act && act.dataset.act === 'play') { playOnly(k); return; }
     goTo(k);
   });
-  $('vChange').addEventListener('click', () => { cancelTry(); $('vRun').classList.add('hidden'); $('vSetup').classList.remove('hidden'); offerResume(); });
+  $('vChange').addEventListener('click', () => { cancelTry(); $('vRun').classList.add('hidden'); $('vSetup').classList.remove('hidden'); $('vLink').value = ''; $('vPaste').value = ''; $('vPasteBox').open = false; vMsg(''); offerResume(); });
   $('vMine').addEventListener('click', () => { if (vid.busy) cancelTry(); pausePlayer(); playAudio((vid.results[vid.i] || {}).audio); });
   $('vDoneSpeak').addEventListener('click', () => { if (mic) mic.stop(); });
   $('vSlow').addEventListener('change', () => { if (yt && yt.setPlaybackRate) yt.setPlaybackRate($('vSlow').checked ? 0.75 : 1); });
@@ -1142,7 +1230,7 @@
     document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
     if (name === 'list') renderList();
     if (name === 'fav') renderFav();
-    if (name === 'video' && !vid.sents.length) offerResume();
+    if (name === 'video') offerResume();
     if (name !== 'video' && vid.busy) cancelTry();
     if (name === 'text') updateTextCount();
   }
@@ -1289,6 +1377,7 @@
     updateChip();
     if ($('tab-list').classList.contains('active')) renderList();
     if ($('tab-fav').classList.contains('active')) renderFav();
+    renderVideoLib();
     if (cur) { cur = findSentence(cur.text) || cur; favButton(); }
   }
   if (!SR) $('sSay').classList.add('hidden');
