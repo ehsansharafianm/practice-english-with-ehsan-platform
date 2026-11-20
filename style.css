@@ -66,7 +66,7 @@ html, body { margin: 0; }
 html { background: var(--page); min-height: 100%; }
 body {
   color: var(--text);
-  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 16px/1.55 "Lexend", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   max-width: 900px;
   margin: 0 auto;
   padding: 0 16px 32px;
@@ -386,7 +386,7 @@ code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: .
 .ipa { font: 1.35rem/1.4 "Charis SIL", "Doulos SIL", "Gentium Plus", "Segoe UI", "Lucida Sans Unicode", "Arial Unicode MS", serif; color: var(--accent); margin: 4px 0 6px; overflow-wrap: anywhere; }
 .ipa-sm { font-family: "Charis SIL", "Doulos SIL", "Segoe UI", "Lucida Sans Unicode", serif; color: var(--accent); }
 .ipa-cell { font-family: "Charis SIL", "Doulos SIL", "Segoe UI", "Lucida Sans Unicode", serif; white-space: nowrap; }
-.flag { display: inline-block; font: 700 .7rem/1 system-ui, sans-serif; letter-spacing: .06em; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; vertical-align: middle; }
+.flag { display: inline-block; font: 700 .7rem/1 "Lexend", system-ui, sans-serif; letter-spacing: .06em; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; vertical-align: middle; }
 .center { text-align: center; justify-content: center; }
 .syls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px; margin: 12px 0 6px; }
 .syls.center { justify-content: center; }
