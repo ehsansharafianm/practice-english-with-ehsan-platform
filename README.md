@@ -1,8 +1,95 @@
-# Practice English with Ehsan Platform
+<p align="center">
+  <img src="favicon.svg" width="72" alt="Practice English with Ehsan logo">
+</p>
 
-A website with practice tools for learning English. No server, no install: plain HTML, CSS and JavaScript, hosted on GitHub Pages.
+<h1 align="center">Practice English with Ehsan</h1>
 
-Live site: https://ehsansharafianm.github.io/practice-english-with-ehsan-platform/
+<p align="center">
+  <b>Shadow real English speakers from YouTube, train your American pronunciation, and build your listening and spelling — free, in your browser.</b>
+</p>
+
+<p align="center">
+  <a href="https://ehsansharafianm.github.io/practice-english-with-ehsan-platform/"><b>▶ Open the website</b></a>
+  ·
+  <a href="https://ehsansharafianm.github.io/practice-english-with-ehsan-platform/shadowing/">Shadow a YouTube video</a>
+  ·
+  <a href="https://ehsansharafianm.github.io/practice-english-with-ehsan-platform/pronunciation/">Pronunciation</a>
+  ·
+  <a href="https://ehsansharafianm.github.io/practice-english-with-ehsan-platform/dictation/">Dictation</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/home.png" alt="The home page of Practice English with Ehsan" width="820">
+</p>
+
+## 🎬 Shadow any YouTube video
+
+Shadowing means listening to a native speaker and repeating right after them, copying their rhythm and melody.
+It is one of the fastest ways to sound natural, and now you can do it with **any English video you like**.
+
+1. **Paste a YouTube link.** The page finds every sentence in the video, with its time.
+2. **Listen to the real speaker.** Each sentence plays straight from the video, then pauses.
+3. **Repeat it.** The page records you and gives you a score for your words, your speed and your melody.
+4. **Compare.** Play the speaker and your own voice side by side, as many times as you want.
+5. **Keep going.** Turn on *Go on by itself* and shadow a whole talk, sentence after sentence.
+
+<p align="center">
+  <img src="docs/images/shadow-video.png" alt="Shadowing a TED talk sentence by sentence" width="820">
+</p>
+
+Every sentence comes with notes on **how it really sounds**:
+
+- **Intonation:** does the voice go up ↗ or down ↘ at the end, and why.
+- **Stress:** the important words are in **bold**. Say them louder, longer and higher.
+- **Connected speech:** *want to* → “wanna”, the American T in *water* → “wa-der”, words that link together (*pick‿it‿up*), and the short “weak” forms of small words.
+
+<p align="center">
+  <img src="docs/images/shadow-video-dark.png" alt="A sentence with its intonation and connected-speech notes, in dark mode" width="720">
+</p>
+
+## 🗣️ Pronunciation
+
+Type or say any word to see its **American pronunciation**: phonetics (IPA), syllables and stress.
+Hear a woman's and a man's voice, record yourself, and get feedback on the word and its stress. Then practise your saved words until they are easy.
+
+<p align="center">
+  <img src="docs/images/pronunciation.png" alt="The pronunciation of the word opportunity, with syllables and stress" width="820">
+</p>
+
+## ⭐ Your own favorite sentences
+
+Bring the sentences you love and want to say perfectly. Paste them one per line, edit them any time,
+and practise them, weakest first. You can also shadow a single sentence or a whole text with a natural American voice.
+
+<p align="center">
+  <img src="docs/images/favorites.png" alt="A list of favorite sentences to practise" width="820">
+</p>
+
+## ✍️ Dictation
+
+Listen to a word and write it. Learn new words, review old ones (weaker words come back more often), and track your daily score.
+
+## Everything in one place
+
+| | |
+|---|---|
+| 🎬 **Shadow a video** | Shadow real speakers from YouTube, sentence by sentence |
+| 🔁 **Shadow a sentence or text** | Repeat after a natural American voice, with a melody chart of your voice |
+| ⭐ **Favorites** | Your own sentences to practise again and again |
+| 🗣️ **Pronunciation** | IPA, syllables and stress for any word, with recording and feedback |
+| ✍️ **Dictation** | Listen-and-write practice with a spell check and daily scores |
+| 🌗 **Light and dark mode** | Easy on the eyes, day and night |
+| 👩‍🏫 **Accounts and teacher dashboard** | Students sign in to keep their progress; the teacher sees everyone's scores |
+
+Free to use. Works best in **Chrome** or **Microsoft Edge** on a computer (they understand speech, and Edge has very natural American voices).
+Allow the microphone when the page asks.
+
+---
+
+# For developers
+
+No build step: plain HTML, CSS and JavaScript, hosted on GitHub Pages.
+A small Cloudflare Worker (in `worker/`) finds YouTube captions for *Shadow a video*.
 
 ## Structure
 
