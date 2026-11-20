@@ -794,7 +794,8 @@
         <div class="row center"><button class="btn mic-btn" type="button" id="prMic">🎙️ Say it</button></div>
         <div id="prMicResult" class="mic-result center" aria-live="polite"></div>`;
       $('prMic').onclick = () => {
-        if (pr.answered) return;
+        // After the word is scored, the button still works for extra practice, but does not change the score.
+        if (pr.answered) { runMic($('prMic'), $('prMicResult'), item.text, null); return; }
         runMic($('prMic'), $('prMicResult'), item.text, (ok) => {
           pr.tries++;
           const w = findWord(item.text);
