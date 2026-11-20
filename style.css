@@ -18,6 +18,10 @@
   --letters: rgba(15, 139, 141, 0.07);
   --shadow: 0 8px 30px rgba(15, 80, 80, 0.10);
   --btn-shadow: 0 6px 16px -6px rgba(15, 139, 141, 0.55);
+  --voice: #2b7bd6;            /* blue: the learner's own voice */
+  --nav: #0e86a8;              /* sky: previous / next */
+  --fav: #e9f7ef;              /* mint: favorites */
+  --fav-ink: #1b7a4b;
   --good: #1f9d55;
   --good-bg: #e6f6ec;
   --bad: #d63939;
@@ -51,6 +55,10 @@
   --letters: rgba(120, 220, 210, 0.06);
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
   --btn-shadow: 0 6px 16px -6px rgba(60, 198, 196, 0.45);
+  --voice: #4f9bf0;
+  --nav: #38b6dc;
+  --fav: #173a2a;
+  --fav-ink: #7fe0aa;
 }
 
 * { box-sizing: border-box; }
@@ -488,3 +496,17 @@ code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: .
 .paste-box summary { cursor: pointer; color: var(--accent); font-weight: 600; }
 #vPaste { display: block; width: 100%; padding: 12px 14px; font: inherit; resize: vertical; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); }
 #vLink { padding: 10px 14px; font: inherit; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--text); }
+.v-actions { align-items: center; }
+.listen-btn { border: 2px solid var(--accent); color: var(--accent); font-weight: 700; padding: 11px 20px; }
+.listen-btn:hover:not(:disabled) { background: var(--accent); color: var(--accent-ink); }
+.voice-btn { background: var(--voice); border-color: var(--voice); color: #fff; font-weight: 700; padding: 12px 22px; box-shadow: 0 6px 16px -6px var(--voice); }
+.voice-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.voice-btn:disabled { background: var(--card); border-color: var(--line); color: var(--muted); box-shadow: none; opacity: 1; }
+.voice-btn.small { padding: 4px 8px; box-shadow: none; }
+.v-nav { margin-top: 10px; }
+.nav-btn { background: var(--nav); border-color: var(--nav); color: #fff; font-weight: 600; box-shadow: 0 6px 16px -8px var(--nav); }
+.nav-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.nav-btn:disabled { background: var(--card); border-color: var(--line); color: var(--muted); box-shadow: none; opacity: 1; }
+.fav-btn { background: var(--fav); border: 2px solid var(--fav-ink); color: var(--fav-ink); font-weight: 600; }
+.fav-btn:hover:not(:disabled), .fav-btn.on-fav { background: var(--fav-ink); color: var(--card); border-color: var(--fav-ink); }
+:root[data-theme="dark"] .nav-btn { color: #04202a; }

@@ -1004,7 +1004,8 @@
     $('vNotes').innerHTML = speechNotes(s.text).map((n) => `<li>${n}</li>`).join('');
     const r = vid.results[vid.i];
     $('vResult').innerHTML = r && r.html ? r.html : '';
-    $('vMine').classList.toggle('hidden', !(r && r.audio));
+    $('vMine').disabled = !(r && r.audio);
+    $('vMine').title = r && r.audio ? 'Hear your last try' : 'Say the sentence first';
     $('vStatus').textContent = '';
     $('vPrev').disabled = vid.i === 0; $('vNext').disabled = vid.i >= vid.sents.length - 1;
     const f = findSentence(s.text);
@@ -1016,7 +1017,8 @@
     $('vTable').querySelector('tbody').innerHTML = vid.sents.map((s, k) => {
       const r = vid.results[k], v = r ? (r.pct === null ? 'skipped' : r.pct + '%') : '';
       const cls = !r || r.pct === null ? 'muted' : r.pct >= 80 ? 'acc-good' : 'acc-bad';
-      return `<tr data-k="${k}" class="${k === vid.i ? 'sel' : ''}"><td>${k + 1}</td><td class="muted">${mmss(s.start)}</td><td class="s-text">${esc(s.text)}</td><td class="${cls}">${v}</td></tr>`;
+      return `<tr data-k="${k}" class="${k === vid.i ? 'sel' : ''}"><td>${k + 1}</td><td class="muted">${mmss(s.start)}</td><td class="s-text">${esc(s.text)}</td><td class="${cls}">${v}</td>
+        <td class="row-acts nowrap"><button type="button" class="btn listen-btn small" data-act="play" title="Listen to the speaker">▶</button><button type="button" class="btn voice-btn small" data-act="me" title="${r && r.audio ? 'Hear your voice' : 'Say it first'}"${r && r.audio ? '' : ' disabled'}>🎧</button></td></tr>`;
     }).join('');
     const sel = $('vTable').querySelector('tr.sel');
     if (sel) { const box = sel.closest('.v-list'); box.scrollTop = Math.max(0, sel.offsetTop - box.clientHeight / 2); }
@@ -1026,7 +1028,14 @@
   $('vPrev').addEventListener('click', () => goTo(vid.i - 1));
   $('vNext').addEventListener('click', () => goTo(vid.i + 1));
   $('vPlay').addEventListener('click', async () => { if (vid.busy) return; const s = vid.sents[vid.i]; vid.stop = false; await playPart(s.start, s.end); });
-  $('vTable').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-k]'); if (tr) goTo(+tr.dataset.k); });
+  $('vTable').addEventListener('click', async (e) => {
+    const tr = e.target.closest('tr[data-k]');
+    if (!tr) return;
+    const k = +tr.dataset.k, act = e.target.closest('[data-act]');
+    if (act && act.dataset.act === 'me') { playAudio((vid.results[k] || {}).audio); return; }
+    if (act && act.dataset.act === 'play') { if (vid.busy) return; const s = vid.sents[k]; vid.stop = false; await playPart(s.start, s.end); return; }
+    goTo(k);
+  });
   $('vChange').addEventListener('click', () => { cancelTry(); $('vRun').classList.add('hidden'); $('vSetup').classList.remove('hidden'); offerResume(); });
   $('vMine').addEventListener('click', () => playAudio((vid.results[vid.i] || {}).audio));
   $('vDoneSpeak').addEventListener('click', () => { if (mic) mic.stop(); });
@@ -1048,7 +1057,7 @@
     try {
       do {
         const k = vid.i, s = vid.sents[k];
-        $('vResult').innerHTML = ''; $('vMine').classList.add('hidden');
+        $('vResult').innerHTML = ''; $('vMine').disabled = true;
         go.textContent = '👂 Listen… (click to stop)'; $('vStatus').textContent = 'Listen to the speaker…';
         if (!(await playPart(s.start, s.end))) break;
         go.textContent = '🎙️ Your turn! (click to stop)'; $('vStatus').innerHTML = '<b>Your turn:</b> say it now, the same way.';
@@ -1065,7 +1074,7 @@
         saveVideo();
         $('vStatus').textContent = '';
         $('vResult').innerHTML = res.html;
-        $('vMine').classList.toggle('hidden', !r.audio);
+        $('vMine').disabled = !r.audio; $('vMine').title = 'Hear your last try';
         renderVideoList();
         $('vBar').style.width = Math.round((vid.results.filter(Boolean).length / vid.sents.length) * 100) + '%';
         if (!$('vOn').checked || vid.i >= vid.sents.length - 1) break;
@@ -1230,6 +1239,7 @@
     open(first, { fromQueue: true });
   });
 
+  offerResume();
   function refresh() {
     updateChip();
     if ($('tab-list').classList.contains('active')) renderList();

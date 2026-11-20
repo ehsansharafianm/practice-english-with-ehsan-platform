@@ -6,7 +6,7 @@
   <title>Shadowing Practice</title>
   <meta name="description" content="Sentence shadowing with American intonation — Practice English with Ehsan Platform">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../style.css?v=20261120a">
+  <link rel="stylesheet" href="../style.css?v=20261120d">
   <script src="../site.js?v=20261119f"></script>
 </head>
 <body>
@@ -21,16 +21,16 @@
   </header>
 
   <nav class="tabs" role="tablist">
-    <button class="tab active" data-tab="practise" role="tab">Shadow a sentence</button>
+    <button class="tab active" data-tab="video" role="tab">Shadow a video</button>
+    <button class="tab" data-tab="practise" role="tab">Shadow a sentence</button>
     <button class="tab" data-tab="text" role="tab">Shadow a text</button>
-    <button class="tab" data-tab="video" role="tab">Shadow a video</button>
     <button class="tab" data-tab="list" role="tab">My sentences</button>
     <button class="tab" data-tab="fav" role="tab">⭐ Favorites</button>
   </nav>
 
   <main>
     <!-- ============ PRACTISE ============ -->
-    <section id="tab-practise" class="panel active">
+    <section id="tab-practise" class="panel">
       <div class="card">
         <h2>Add a sentence</h2>
         <p class="hint">Type a sentence, or click <b>Say a sentence</b> and say it. Then listen to the American voice and repeat it right after, copying the rhythm and the melody (intonation).</p>
@@ -134,7 +134,7 @@
     </section>
 
     <!-- ============ SHADOW A VIDEO ============ -->
-    <section id="tab-video" class="panel">
+    <section id="tab-video" class="panel active">
       <div id="vSetup" class="card">
         <h2>Shadow a YouTube video</h2>
         <p class="hint">Paste a link to a YouTube video in English. The page finds its sentences, plays them one by one in the speaker's real voice,
@@ -168,26 +168,28 @@
         <div id="vShow" class="s-show" style="margin-top:12px"></div>
         <p id="vTune" class="hint"></p>
         <ul id="vNotes" class="cs-notes"></ul>
-        <div class="row center"><button id="vGo" class="btn mic-btn big-go" type="button">🔁 Play, then repeat</button></div>
+        <div class="row center v-actions">
+          <button id="vPlay" class="btn listen-btn" type="button">▶ Speaker</button>
+          <button id="vGo" class="btn mic-btn big-go" type="button">🔁 Play, then repeat</button>
+          <button id="vMine" class="btn voice-btn" type="button" disabled title="Say the sentence first">🎧 My voice</button>
+        </div>
+        <div class="row center v-nav">
+          <button id="vPrev" class="btn nav-btn" type="button">⏮ Previous</button>
+          <button id="vFav" class="btn fav-btn" type="button">☆ Add to favorites</button>
+          <button id="vNext" class="btn nav-btn" type="button">Next ⏭</button>
+        </div>
         <div class="row center" style="margin-top:4px"><button id="vDoneSpeak" class="btn mic-btn hidden" type="button">✓ Done speaking</button></div>
         <p id="vStatus" class="s-status center" aria-live="polite"></p>
         <div id="vResult" aria-live="polite"></div>
-        <div class="row">
-          <button id="vPrev" class="btn ghost" type="button">⏮ Previous</button>
-          <button id="vPlay" class="btn ghost" type="button">▶ Play sentence</button>
-          <button id="vNext" class="btn ghost" type="button">Next ⏭</button>
-          <button id="vMine" class="btn ghost hidden" type="button">🎧 My voice</button>
-          <button id="vFav" class="btn ghost" type="button">☆ Add to favorites</button>
-        </div>
         <div class="row" style="align-items:center">
           <label class="check slow-check"><input type="checkbox" id="vSlow"> 🐢 Slow (0.75×)</label>
           <label class="check slow-check"><input type="checkbox" id="vOn"> Go on to the next sentence by itself</label>
         </div>
         <h3 class="sub-h">Sentences</h3>
         <div class="table-wrap v-list">
-          <table id="vTable" class="click-rows score-rows"><thead><tr><th>#</th><th>Time</th><th>Sentence</th><th>Match</th></tr></thead><tbody></tbody></table>
+          <table id="vTable" class="click-rows score-rows"><thead><tr><th>#</th><th>Time</th><th>Sentence</th><th>Match</th><th></th></tr></thead><tbody></tbody></table>
         </div>
-        <p class="hint">Click a sentence to go to it.</p>
+        <p class="hint">Click a sentence to go to it. ▶ the speaker · 🎧 your voice.</p>
       </div>
     </section>
 
@@ -251,7 +253,7 @@
   </main>
 
   <footer class="foot"><a class="home-link" href="../">Practice English with Ehsan Platform</a> · Shadowing Practice</footer>
-  <script src="app.js?v=20261120b"></script>
+  <script src="app.js?v=20261120d"></script>
   <script type="module" src="../account.js?v=20261118b"></script>
 </body>
 </html>
