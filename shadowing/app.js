@@ -959,7 +959,12 @@
           return;
         }
         if (t >= to - 0.12 || st === 0 || st === 2 || Date.now() - started > endBy) { // stop a moment early: pausing takes a little time
-          clearInterval(tick); pausePlayer(); resolve(true);
+          clearInterval(tick); pausePlayer();
+          // wait until the player has really stopped, so the recording never hears the video
+          const until = Date.now() + 800;
+          const settle = setInterval(() => {
+            if (!isRun(run) || yt.getPlayerState() !== 1 || Date.now() > until) { clearInterval(settle); resolve(isRun(run)); }
+          }, 20);
         }
       }, 40);
     });
@@ -1061,8 +1066,9 @@
     const s = vid.sents[k];
     await playPart(s.start, s.end, newRun());
   }
-  $('vPrev').addEventListener('click', () => goTo(vid.i - 1));
-  $('vNext').addEventListener('click', () => goTo(vid.i + 1));
+  // Previous / Next go to the sentence and play it from the video right away.
+  $('vPrev').addEventListener('click', () => { goTo(vid.i - 1); playOnly(vid.i); });
+  $('vNext').addEventListener('click', () => { goTo(vid.i + 1); playOnly(vid.i); });
   $('vPlay').addEventListener('click', () => playOnly(vid.i));
   $('vTable').addEventListener('click', (e) => {
     const tr = e.target.closest('tr[data-k]');
