@@ -90,7 +90,11 @@ async function getCaptions(id) {
   if (status === 'LOGIN_REQUIRED' && !p.captions) return { error: 'blocked', message: 'YouTube did not allow the captions to be read right now. Please paste the transcript instead.' };
   const tracks = (((p.captions || {}).playerCaptionsTracklistRenderer || {}).captionTracks) || [];
   const en = tracks.filter((t) => /^en\b/i.test(t.languageCode || ''));
-  if (!en.length) return { error: 'no-captions', message: tracks.length ? 'This video has no English captions.' : 'This video has no captions.' };
+  if (!en.length) {
+    return tracks.length
+      ? { error: 'no-captions', none: false, message: 'This video has captions, but not in English.' }
+      : { error: 'no-captions', none: true, message: 'YouTube has no captions for this video, not even automatic ones, so there are no sentences to find. This often happens with Shorts and short clips.' };
+  }
   // people-made captions first, then automatic ones; en-US before other English
   const score = (t) => (t.kind === 'asr' ? 0 : 10) + (/^en(-US)?$/i.test(t.languageCode) ? 2 : 0);
   const track = en.sort((a, b) => score(b) - score(a))[0];

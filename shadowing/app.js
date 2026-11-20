@@ -961,6 +961,10 @@
       data = await r.json();
     } catch (err) { data = { error: 'failed', message: 'Could not reach the caption helper.' }; }
     $('vLoad').disabled = false;
+    if (data.error === 'no-captions') {
+      $('vPasteBox').open = false;
+      return vMsg(`${esc(data.message || 'This video has no English captions.')}<br>Please try another video. Tip: on YouTube, videos with captions show a <b>CC</b> button, and in search you can choose <b>Filters → Subtitles/CC</b>.`);
+    }
     if (data.error) { $('vPasteBox').open = true; return vMsg(`${esc(data.message || 'Could not get the captions.')} You can paste the transcript below instead.`); }
     startVideo({ id, title: data.title, auto: data.auto, sents: buildSentences(data.words) });
   });
