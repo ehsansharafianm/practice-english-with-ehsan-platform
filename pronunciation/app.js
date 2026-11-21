@@ -1,4 +1,4 @@
-/* Pronunciation Practice — Practice with Ehsan (English or Spanish: window.PEWE_L, set by ../site.js)
+/* Pronunciation Practice — Practice with Sharaf (English or Spanish: window.PEWE_L, set by ../site.js)
  * Spanish (Spain): syllables, stress and IPA are worked out from the spelling by ../spanish.js.
  * English: American pronunciations (phonetics, syllables, stress) come from the CMU Pronouncing Dictionary,
  * split by first letter in data/*.txt. Format: word<TAB>syllables;variant  (syllables split by ".",

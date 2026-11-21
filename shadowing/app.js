@@ -1,4 +1,4 @@
-/* Shadowing Practice — Practice with Ehsan (English or Spanish: window.PEWE_L, set by ../site.js)
+/* Shadowing Practice — Practice with Sharaf (English or Spanish: window.PEWE_L, set by ../site.js)
  * The learner adds a sentence (typed or said), listens to an American voice, then repeats it.
  * The page checks the words (browser speech recognition, Chrome/Edge), the melody at the end of the
  * sentence (pitch from the recording), how lively the voice is, and the speed. Everything except the

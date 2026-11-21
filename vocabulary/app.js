@@ -1,4 +1,4 @@
-/* Vocabulary — Practice with Ehsan (English or Spanish: window.PEWE_L, set by ../site.js)
+/* Vocabulary — Practice with Sharaf (English or Spanish: window.PEWE_L, set by ../site.js)
  * Only the learner's own words: their library, one per language (there are no built-in word lists).
  * Spanish: English meanings, IPA and stress (../spanish.js), a Spain voice.
  * English: the learner's own library, with American IPA and stress (../english.js) and English definitions.

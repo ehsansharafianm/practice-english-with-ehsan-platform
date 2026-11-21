@@ -1,4 +1,4 @@
-/* American English pronunciation lookup — Practice with Ehsan
+/* American English pronunciation lookup — Practice with Sharaf
  * Uses the CMU Pronouncing Dictionary files of the Pronunciation page (pronunciation/data/<letter>.txt).
  *   await EN_PRON.lookup('pronunciation') ->
  *     { ipa: 'pɹəˌnʌnsiˈeɪʃən', syllables: [{ text: 'pruh', ipa: 'prə', stress: 0 }, …] }   or null when unknown

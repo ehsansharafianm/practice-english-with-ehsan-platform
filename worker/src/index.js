@@ -1,4 +1,4 @@
-/* Caption helper for Practice with Ehsan (Cloudflare Worker).
+/* Caption helper for Practice with Sharaf (Cloudflare Worker).
  *
  * The website cannot read YouTube captions itself (the browser blocks it), so it asks this helper:
  *   GET /captions?v=<YouTube link or video id>&lang=en|es   (default en)

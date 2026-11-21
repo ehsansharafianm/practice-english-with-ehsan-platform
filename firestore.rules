@@ -1,5 +1,5 @@
 rules_version = '2';
-// Security rules for Practice with Ehsan.
+// Security rules for Practice with Sharaf.
 // Paste into: Firebase console -> Firestore Database -> Rules -> Publish.
 service cloud.firestore {
   match /databases/{database}/documents {

@@ -1,4 +1,4 @@
-/* Spanish (Spain) pronunciation from spelling — Practice with Ehsan
+/* Spanish (Spain) pronunciation from spelling — Practice with Sharaf
  * Spanish spelling is regular, so syllables, stress and IPA can be worked out from the written word:
  *   ES_PRON.syllables('gracias') -> [{ text: 'gra', ipa: 'ɡɾa', stress: 0 }, { text: 'cias', ipa: 'θjas', stress: 1 }]
  *   ES_PRON.ipa('ciudad')        -> 'θjuˈðað'

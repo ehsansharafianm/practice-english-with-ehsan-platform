@@ -1,25 +1,25 @@
 <p align="center">
-  <img src="favicon.svg" width="72" alt="Practice with Ehsan logo">
+  <img src="favicon.svg" width="72" alt="Practice with Sharaf logo">
 </p>
 
-<h1 align="center">Practice with Ehsan</h1>
+<h1 align="center">Practice with Sharaf</h1>
 
 <p align="center">
   <b>Practise English 🇬🇧 or Spanish 🇪🇸: shadow real speakers from YouTube, train your pronunciation, and build your listening and spelling — free, in your browser.</b>
 </p>
 
 <p align="center">
-  <a href="https://ehsansharafianm.github.io/practice-with-ehsan/"><b>▶ Open the website</b></a>
+  <a href="https://ehsansharafianm.github.io/practice-with-sharaf/"><b>▶ Open the website</b></a>
   ·
-  <a href="https://ehsansharafianm.github.io/practice-with-ehsan/shadowing/">Shadow a YouTube video</a>
+  <a href="https://ehsansharafianm.github.io/practice-with-sharaf/shadowing/">Shadow a YouTube video</a>
   ·
-  <a href="https://ehsansharafianm.github.io/practice-with-ehsan/pronunciation/">Pronunciation</a>
+  <a href="https://ehsansharafianm.github.io/practice-with-sharaf/pronunciation/">Pronunciation</a>
   ·
-  <a href="https://ehsansharafianm.github.io/practice-with-ehsan/dictation/">Dictation</a>
+  <a href="https://ehsansharafianm.github.io/practice-with-sharaf/dictation/">Dictation</a>
 </p>
 
 <p align="center">
-  <img src="docs/images/home.png" alt="The home page of Practice with Ehsan" width="820">
+  <img src="docs/images/home.png" alt="The home page of Practice with Sharaf" width="820">
 </p>
 
 ## 🇬🇧 🇪🇸 English or Spanish

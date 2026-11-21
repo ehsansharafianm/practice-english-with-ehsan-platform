@@ -75,7 +75,7 @@
     var brand = document.createElement('a');
     brand.className = 'site-brand';
     brand.href = base;
-    brand.innerHTML = '<img src="' + base + 'favicon.svg?v=20261119f" alt="" width="28" height="28"><span>Practice with Ehsan</span>';
+    brand.innerHTML = '<img src="' + base + 'favicon.svg?v=20261119f" alt="" width="28" height="28"><span>Practice with Sharaf</span>';
 
     var nav = document.createElement('nav');
     nav.className = 'site-tabs';

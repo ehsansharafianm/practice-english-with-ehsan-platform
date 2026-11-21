@@ -1,4 +1,4 @@
-/* Dictation Practice — Practice with Ehsan (English or Spanish: window.PEWE_L, set by ../site.js)
+/* Dictation Practice — Practice with Sharaf (English or Spanish: window.PEWE_L, set by ../site.js)
  * Guests: data is stored in this browser (localStorage).
  * Signed-in students: data is also saved to their account (see ../account.js),
  * so it follows them to any device and the teacher can see their scores.
