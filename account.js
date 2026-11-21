@@ -73,7 +73,7 @@ async function start() {
   // Shadowing Practice keeps its sentences and daily scores in the "shad" field.
   api.saveShad = async (d) => {
     if (!api.user) return;
-    await put('shad', JSON.parse(JSON.stringify({ sentences: d.sentences || [], days: d.days || {} })));
+    await put('shad', JSON.parse(JSON.stringify({ sentences: d.sentences || [], days: d.days || {}, videos: d.videos || [] })));
   };
   // Vocabulary (Spanish words) keeps the learner's progress and own words in es.vocab.
   api.saveVocab = async (v) => {
