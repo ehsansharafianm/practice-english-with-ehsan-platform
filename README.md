@@ -9,13 +9,13 @@
 </p>
 
 <p align="center">
-  <a href="https://ehsansharafianm.github.io/practice-english-with-ehsan-platform/"><b>▶ Open the website</b></a>
+  <a href="https://ehsansharafianm.github.io/practice-with-ehsan/"><b>▶ Open the website</b></a>
   ·
-  <a href="https://ehsansharafianm.github.io/practice-english-with-ehsan-platform/shadowing/">Shadow a YouTube video</a>
+  <a href="https://ehsansharafianm.github.io/practice-with-ehsan/shadowing/">Shadow a YouTube video</a>
   ·
-  <a href="https://ehsansharafianm.github.io/practice-english-with-ehsan-platform/pronunciation/">Pronunciation</a>
+  <a href="https://ehsansharafianm.github.io/practice-with-ehsan/pronunciation/">Pronunciation</a>
   ·
-  <a href="https://ehsansharafianm.github.io/practice-english-with-ehsan-platform/dictation/">Dictation</a>
+  <a href="https://ehsansharafianm.github.io/practice-with-ehsan/dictation/">Dictation</a>
 </p>
 
 <p align="center">
