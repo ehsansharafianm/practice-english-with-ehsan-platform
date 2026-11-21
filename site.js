@@ -7,7 +7,7 @@
     { name: 'Dictation', path: 'dictation/' },
     { name: 'Pronunciation', path: 'pronunciation/' },
     { name: 'Shadowing', path: 'shadowing/' },
-    { name: 'Vocabulary', path: 'vocabulary/', only: 'es' }, // Spanish words with English meanings
+    { name: 'Vocabulary', path: 'vocabulary/' }, // words with meanings and pronunciation, and the learner's own library
     { name: 'More soon', path: null } // placeholder for the next tool
   ];
 

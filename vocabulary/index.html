@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Spanish Vocabulary</title>
-  <meta name="description" content="Learn Spanish words with their English meanings and pronunciation (Spain) — Practice with Ehsan">
+  <title>Vocabulary</title>
+  <meta name="description" content="Learn English or Spanish words with their meanings and pronunciation, and build your own word library — Practice with Ehsan">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap">
-  <link rel="stylesheet" href="../style.css?v=20261120y">
-  <script src="../site.js?v=20261120y"></script>
+  <link rel="stylesheet" href="../style.css?v=20261120z">
+  <script src="../site.js?v=20261120z"></script>
 </head>
 <body>
   <header class="top">
     <div class="brand">
-      <h1>Spanish Vocabulary</h1><span class="lang-badge L-badge"></span>
+      <h1>Vocabulary</h1><span class="lang-badge L-badge"></span>
     </div>
     <div class="today-chip" title="Today's vocabulary score">
       <span class="chip-label">Today</span>
@@ -23,17 +23,11 @@
     </div>
   </header>
 
-  <div id="notEs" class="card hidden">
-    <h2>Vocabulary is for Spanish</h2>
-    <p class="hint">Learn Spanish words with their English meanings and how to say them. Switch to Spanish to start.</p>
-    <button class="btn primary" type="button" data-set-lang="es">🇪🇸 Practise Spanish</button>
-  </div>
-
   <nav class="tabs" id="vocabTabs" role="tablist">
     <button class="tab active" data-tab="learn" role="tab">Learn</button>
     <button class="tab" data-tab="cards" role="tab">Flashcards</button>
     <button class="tab" data-tab="quiz" role="tab">Quiz</button>
-    <button class="tab" data-tab="mine" role="tab">My words</button>
+    <button class="tab" data-tab="mine" role="tab">➕ Add word</button>
   </nav>
 
   <main id="vocabMain">
@@ -42,10 +36,9 @@
       <div class="card">
         <div class="lib-head">
           <h2>Learn words <span id="lCount" class="muted"></span></h2>
-          <input id="lSearch" type="search" placeholder="Search Spanish or English…" aria-label="Search words">
+          <input id="lSearch" type="search" placeholder="Search…" aria-label="Search words">
         </div>
-        <p class="hint">Pick a topic. Each word has its English meaning, its sounds (IPA, Spain) and its syllables: the <span class="stress-key">BIG</span> one is stressed.
-          ▶ listen · 🐢 slowly · 🎙️ say it and I check it.</p>
+        <p class="hint" id="lHint"></p>
         <div id="lTopics" class="topic-chips" role="group" aria-label="Topics"></div>
         <div id="lGrid" class="word-grid"></div>
       </div>
@@ -55,7 +48,7 @@
     <section id="tab-cards" class="panel">
       <div id="cSetup" class="card">
         <h2>Flashcards</h2>
-        <p class="hint">See and hear a Spanish word, think of its meaning, then turn the card. Words you don't know come back sooner.</p>
+        <p class="hint">See and hear a word, think of its meaning, then turn the card. Words you don't know come back sooner.</p>
         <div class="row" style="align-items:center">
           <label class="voice-pick">Topic <select id="cTopic"></select></label>
           <label class="voice-pick">Cards <select id="cCount"><option value="10">10</option><option value="20" selected>20</option><option value="40">40</option></select></label>
@@ -93,9 +86,9 @@
           <label class="voice-pick">Topic <select id="qTopic"></select></label>
           <label class="voice-pick">Type
             <select id="qMode">
-              <option value="es2en">Spanish → English</option>
-              <option value="en2es">English → Spanish</option>
-              <option value="listen">Listen → English</option>
+              <option value="es2en">Word → meaning</option>
+              <option value="en2es">Meaning → word</option>
+              <option value="listen">Listen → meaning</option>
             </select>
           </label>
           <label class="voice-pick">Questions <select id="qCount"><option value="10" selected>10</option><option value="20">20</option></select></label>
@@ -119,48 +112,54 @@
       </div>
     </section>
 
-    <!-- ============ MY WORDS ============ -->
+    <!-- ============ ADD WORD ============ -->
     <section id="tab-mine" class="panel">
       <div class="card">
-        <h2>Add your own words</h2>
-        <p class="hint">Type a Spanish word or short phrase and click <b>Check word</b>. If the spelling looks wrong, you get the closest Spanish words to choose from.
-          Then you see how to say it and its English meaning, and you can add it to your words.
-          (The word you type is sent to the free LanguageTool spell checker and the MyMemory translation service.)</p>
+        <h2>Add a new word</h2>
+        <p class="hint" id="mHint"></p>
         <form id="mForm" autocomplete="off">
-          <label>Spanish word or phrase <input id="mEs" type="text" maxlength="60" required spellcheck="false" autocapitalize="off" aria-describedby="mMsg"></label>
-          <div class="row" style="margin-top:0"><button id="mCheckBtn" class="btn primary" type="submit">Check word</button></div>
+          <label><span id="mLabel">Word or phrase</span> <input id="mEs" type="text" maxlength="60" required spellcheck="false" autocapitalize="off" aria-describedby="mMsg"></label>
+          <div class="row" style="margin-top:0">
+            <button id="mCheckBtn" class="btn primary" type="submit">✓ Check word</button>
+            <button id="mSayBtn" class="btn mic-btn" type="button">🎙️ Say a word</button>
+          </div>
         </form>
         <div id="mCheck" class="spell hidden" aria-live="polite"></div>
         <div id="mPreview" class="m-preview hidden" aria-live="polite">
-          <div class="w-top"><span id="pEs" class="w-es" lang="es"></span><span id="pChecked" class="w-state ok"></span></div>
+          <div class="w-top"><span id="pEs" class="w-es"></span><span id="pChecked" class="w-state ok"></span></div>
           <div id="pIpa" class="w-ipa"></div>
-          <div id="pSyl" class="w-syl" lang="es"></div>
+          <div id="pSyl" class="w-syl"></div>
           <div class="w-acts">
             <button id="pSay" type="button" class="btn listen-btn small" title="Listen">▶ Listen</button>
             <button id="pSlow" type="button" class="btn ghost small" title="Listen slowly">🐢 Slowly</button>
           </div>
-          <label class="m-meaning">English meaning
-            <span class="m-meaning-row"><input id="mEn" type="text" maxlength="80"><button id="mSuggest" class="btn ghost small" type="button" title="Suggest the meaning again">💡 Suggest</button></span>
+          <label class="m-meaning"><span id="mMeanLabel">Meaning</span>
+            <span class="m-meaning-row"><input id="mEn" type="text" maxlength="120"><button id="mSuggest" class="btn ghost small" type="button" title="Suggest the meaning again">💡 Suggest</button></span>
           </label>
           <div class="row" style="margin-top:4px">
-            <button id="mAdd" class="btn primary" type="button">⭐ Add to my words</button>
+            <button id="mAdd" class="btn primary" type="button">⭐ Add to my library</button>
             <button id="mCancel" class="btn ghost" type="button">Cancel</button>
           </div>
         </div>
         <p id="mMsg" class="hint" aria-live="polite"></p>
       </div>
       <div class="card">
-        <h2>My words <span id="mCount" class="muted"></span></h2>
-        <div id="mEmpty" class="empty hidden">No words yet. Add one above; your words also appear in Flashcards and Quiz (topic “My words”).</div>
+        <div class="lib-head">
+          <h2>My library <span id="mCount" class="muted"></span></h2>
+          <input id="mSearch" type="search" placeholder="Search…" aria-label="Search my library">
+        </div>
+        <div id="mEmpty" class="empty hidden">Your library is empty. Add your first word above: type it, or say it with 🎙️.</div>
         <div id="mGrid" class="word-grid"></div>
+        <p class="hint">Your words are also in Learn, Flashcards and Quiz (topic “My library”).</p>
       </div>
     </section>
   </main>
 
-  <footer class="foot"><a class="home-link" href="../">Practice with Ehsan</a> · Spanish Vocabulary</footer>
+  <footer class="foot"><a class="home-link" href="../">Practice with Ehsan</a> · Vocabulary</footer>
   <script src="../spanish.js?v=20261120a"></script>
+  <script src="../english.js?v=20261120a"></script>
   <script src="words.js?v=20261120a"></script>
-  <script src="app.js?v=20261120c"></script>
-  <script type="module" src="../account.js?v=20261120y"></script>
+  <script src="app.js?v=20261120h"></script>
+  <script type="module" src="../account.js?v=20261120z"></script>
 </body>
 </html>

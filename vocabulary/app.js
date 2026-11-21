@@ -1,40 +1,37 @@
-/* Spanish Vocabulary — Practice with Ehsan
- * Spanish words (Spain) with English meanings, IPA and stress (../spanish.js), a Spain voice, and three ways to learn:
- * Learn (word cards), Flashcards (words you miss come back sooner), Quiz (4 choices).
- * Learners can add their own words: LanguageTool checks the spelling (and suggests the closest Spanish words),
- * the free MyMemory translation API suggests the English meaning.
- * Guests: saved in this browser. Signed-in students: also saved to their account (es.vocab, see ../account.js).
+/* Vocabulary — Practice with Ehsan (English or Spanish: window.PEWE_L, set by ../site.js)
+ * Spanish: built-in word lists (words.js) with English meanings, IPA and stress (../spanish.js), a Spain voice.
+ * English: the learner's own library, with American IPA and stress (../english.js) and English definitions.
+ * Learn (word cards), Flashcards (words you miss come back sooner), Quiz (4 choices), Add word (type or say a word:
+ * LanguageTool checks the spelling and suggests the closest words; MyMemory (Spanish) or dictionaryapi.dev (English)
+ * suggests the meaning; the word goes to the learner's library).
+ * Guests: saved in this browser. Signed-in students: also in their account (vocab / es.vocab, see ../account.js).
+ * Library words keep the old field names: es = the word, en = its meaning.
  */
 (() => {
   'use strict';
 
-  const L = window.PEWE_L || { code: 'en' };
+  const L = window.PEWE_L || { code: 'en', name: 'English', bcp: 'en-US', voiceRe: /^en[-_]US/i, anyVoiceRe: /^en\b/i };
+  const ES = L.code === 'es';
   const $ = (id) => document.getElementById(id);
-  if (L.code !== 'es') {
-    // This page is for Spanish only.
-    $('notEs').classList.remove('hidden');
-    $('vocabTabs').classList.add('hidden');
-    $('vocabMain').classList.add('hidden');
-    return;
-  }
 
   const POINTS = 10;
   const MAX_BOX = 5;
-  const STORE_KEY = window.PEWE_KEY ? window.PEWE_KEY('vocab-v1') : 'vocab-v1-es';
+  const STORE_KEY = window.PEWE_KEY ? window.PEWE_KEY('vocab-v1') : 'vocab-v1';
   let storeKey = STORE_KEY, cloudOK = false, cloudTimer = null;
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim();
-  const plain = (s) => clean(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ ]/g, '').trim();
+  const plain = (s) => clean(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9ñ ]/g, '').trim();
   const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const show = (...ids) => ids.forEach((id) => $(id).classList.remove('hidden'));
   const hide = (...ids) => ids.forEach((id) => $(id).classList.add('hidden'));
 
   // ---------- words ----------
-  const TOPICS = window.VOCAB_TOPICS || [];
-  const BUILT = (window.VOCAB_WORDS || []).map(([topic, es, en]) => ({ es, en, topic }));
-  const topicName = (id) => (id === 'mine' ? 'My words' : id === 'all' ? 'All topics' : (TOPICS.find((t) => t.id === id) || {}).name || id);
+  // The built-in topic lists are Spanish; in English the learner's own library is the word list.
+  const TOPICS = ES ? (window.VOCAB_TOPICS || []) : [];
+  const BUILT = ES ? (window.VOCAB_WORDS || []).map(([topic, es, en]) => ({ es, en, topic })) : [];
+  const topicName = (id) => (id === 'mine' ? 'My library' : id === 'all' ? 'All topics' : (TOPICS.find((t) => t.id === id) || {}).name || id);
 
   // ---------- storage ----------
   // words: { [spanish]: { box, right, wrong, last } }, mine: [{ es, en, added }], days: { date: { tries, correct, score, newWords } }
@@ -92,19 +89,31 @@
     save(); updateChip();
   }
   const learned = (w) => ((db.words[w.es] || {}).box || 0) >= 3;
-  const allWords = () => BUILT.concat(db.mine.map((m) => ({ es: m.es, en: m.en, topic: 'mine' })));
+  const allWords = () => BUILT.concat(db.mine.map((m) => ({ es: m.es, en: m.en, ipa: m.ipa, syl: m.syl, topic: 'mine' })));
   const wordsOf = (topic) => (topic === 'all' ? allWords() : allWords().filter((w) => w.topic === topic));
 
   // ---------- sounds ----------
+  // Sounds: Spanish from the spelling (ES_PRON); English from the American dictionary (EN_PRON), saved with the word.
   const P = window.ES_PRON;
-  const tokens = (t) => clean(t).split(' ').map((w) => w.replace(/[^\p{L}]/gu, '')).filter(Boolean);
-  const ipaOf = (t) => (P ? '/' + tokens(t).map((w) => P.ipa(w)).join(' ') + '/' : '');
-  function sylHtml(t) {
-    if (!P) return '';
-    return tokens(t).map((w) => {
-      const sy = P.syllables(w);
-      return sy.map((s) => `<span class="${sy.length > 1 && s.stress ? 'v-stress' : ''}">${esc(sy.length > 1 && s.stress ? s.text.toUpperCase() : s.text)}</span>`).join('<i>·</i>');
-    }).join('<i class="gap"> </i>');
+  const tokens = (t) => clean(t).split(' ').map((w) => w.replace(/[^\p{L}']/gu, '')).filter(Boolean);
+  // syllables -> [{ text, stress }] with { gap: true } between words
+  function sylList(t) {
+    if (!ES || !P) return [];
+    const out = [];
+    tokens(t).forEach((w, i) => { const sy = P.syllables(w); if (i) out.push({ gap: true }); sy.forEach((x) => out.push(sy.length > 1 ? x : { ...x, stress: 0 })); });
+    return out;
+  }
+  const ipaText = (t) => (ES && P ? tokens(t).map((w) => P.ipa(w)).join(' ') : '');
+  const ipaOf = (w) => { const i = typeof w === 'string' ? ipaText(w) : (w.ipa || ipaText(w.es)); return i ? '/' + i + '/' : ''; };
+  function sylHtml(w) {
+    const list = typeof w === 'string' ? sylList(w) : (w.syl && w.syl.length ? w.syl : sylList(w.es));
+    let html = '', prevWord = false;
+    list.forEach((s) => {
+      if (s.gap) { html += '<i class="gap"> </i>'; prevWord = false; return; }
+      html += (prevWord ? '<i>·</i>' : '') + `<span class="${s.stress ? 'v-stress' : ''}">${esc(s.stress ? s.text.toUpperCase() : s.text)}</span>`;
+      prevWord = true;
+    });
+    return html;
   }
 
   // ---------- voice ----------
@@ -113,8 +122,8 @@
   function voice() {
     const all = canSpeak ? speechSynthesis.getVoices() : [];
     const good = (v) => (/natural|online|neural/i.test(v.name) ? 3 : 0) + (/google/i.test(v.name) ? 1 : 0) - (NOVELTY.test(v.name) ? 5 : 0);
-    const es = all.filter((v) => /^es[-_]ES/i.test(v.lang));
-    const list = es.length ? es : all.filter((v) => /^es\b/i.test(v.lang));
+    const exact = all.filter((v) => L.voiceRe.test(v.lang));
+    const list = exact.length ? exact : all.filter((v) => L.anyVoiceRe.test(v.lang));
     return list.sort((a, b) => good(b) - good(a))[0] || null;
   }
   if (canSpeak) { speechSynthesis.getVoices(); speechSynthesis.addEventListener('voiceschanged', () => {}); }
@@ -122,7 +131,7 @@
     if (!canSpeak || !text) return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(clean(text).replace(/[¿?¡!]/g, ''));
-    u.lang = 'es-ES';
+    u.lang = L.bcp;
     const v = voice(); if (v) u.voice = v;
     u.rate = slow ? 0.6 : 0.9;
     speechSynthesis.speak(u);
@@ -135,7 +144,7 @@
     return new Promise((resolve) => {
       const r = new SR();
       let alts = [], error = '';
-      r.lang = 'es-ES'; r.maxAlternatives = 5; r.interimResults = false; r.continuous = false;
+      r.lang = L.bcp; r.maxAlternatives = 5; r.interimResults = false; r.continuous = false;
       r.onresult = (e) => { alts = Array.from(e.results[0] || []).map((a) => a.transcript); };
       r.onerror = (e) => { error = e.error; };
       r.onend = () => { rec = null; resolve({ alts, error }); };
@@ -146,7 +155,7 @@
   // Right if what was heard has the same words (accents ignored) or sounds the same.
   function saidRight(target, alts) {
     const want = plain(target).split(' ').filter(Boolean);
-    const key = (w) => (P ? P.key(w) : w);
+    const key = (w) => (ES && P ? P.key(w) : w);
     return alts.some((a) => {
       const got = plain(a).split(' ').filter(Boolean);
       if (got.join(' ').includes(want.join(' '))) return true;
@@ -176,10 +185,10 @@
     const s = db.words[w.es] || {};
     const state = learned(w) ? '<span class="w-state ok" title="Learned">✓ learned</span>' : s.last ? '<span class="w-state">learning</span>' : '';
     return `<div class="wcard" data-es="${esc(w.es)}">
-      <div class="w-top"><span class="w-es" lang="es">${esc(w.es)}</span>${state}</div>
+      <div class="w-top"><span class="w-es" lang="${L.code}">${esc(w.es)}</span>${state}</div>
       <div class="w-en">${esc(w.en)}</div>
-      <div class="w-ipa">${esc(ipaOf(w.es))}</div>
-      <div class="w-syl" lang="es">${sylHtml(w.es)}</div>
+      <div class="w-ipa">${esc(ipaOf(w))}</div>
+      <div class="w-syl" lang="${L.code}">${sylHtml(w)}</div>
       <div class="w-acts">
         <button type="button" class="btn listen-btn small" data-act="say" title="Listen">▶</button>
         <button type="button" class="btn ghost small" data-act="slow" title="Listen slowly">🐢</button>
@@ -199,16 +208,16 @@
     else if (act === 'slow') say(w.es, true);
     else if (act === 'mic') sayIt(b, card.querySelector('.w-res'), w);
     else if (act === 'del') {
-      if (!confirm(`Delete “${w.es}” from My words?`)) return;
+      if (!confirm(`Delete “${w.es}” from your library?`)) return;
       db.mine = db.mine.filter((m) => m.es !== w.es); delete db.words[w.es]; save(); renderMine();
     }
   }
 
   // ---------- Learn ----------
-  let topic = TOPICS[0] ? TOPICS[0].id : 'all';
+  let topic = TOPICS[0] ? TOPICS[0].id : 'mine';
   function renderTopics() {
     const ts = TOPICS.map((t) => ({ ...t, words: BUILT.filter((w) => w.topic === t.id) }));
-    if (db.mine.length) ts.push({ id: 'mine', name: 'My words', icon: '⭐', words: wordsOf('mine') });
+    if (db.mine.length || !ES) ts.push({ id: 'mine', name: 'My library', icon: '⭐', words: wordsOf('mine') });
     $('lTopics').innerHTML = ts.map((t) => {
       const n = t.words.length, k = t.words.filter(learned).length;
       return `<button type="button" class="topic-chip${t.id === topic ? ' on' : ''}" data-topic="${t.id}" aria-pressed="${t.id === topic}">
@@ -220,7 +229,8 @@
     const q = plain($('lSearch').value);
     const list = q ? allWords().filter((w) => plain(w.es).includes(q) || plain(w.en).includes(q)) : wordsOf(topic);
     $('lCount').textContent = q ? `(${list.length} found)` : `(${allWords().length} words)`;
-    $('lGrid').innerHTML = list.map((w) => cardHtml(w)).join('') || '<p class="empty">No words found.</p>';
+    $('lGrid').innerHTML = list.map((w) => cardHtml(w)).join('')
+      || (!q && topic === 'mine' ? '<p class="empty">Your library is empty. Add words in the <b>➕ Add word</b> tab: type them or say them.</p>' : '<p class="empty">No words found.</p>');
   }
   $('lTopics').addEventListener('click', (e) => { const b = e.target.closest('[data-topic]'); if (!b) return; topic = b.dataset.topic; $('lSearch').value = ''; renderLearn(); });
   $('lSearch').addEventListener('input', renderLearn);
@@ -229,8 +239,8 @@
   // ---------- topic menus ----------
   function fillTopicSelect(sel) {
     const cur = sel.value;
-    sel.innerHTML = '<option value="all">All topics</option>' + TOPICS.map((t) => `<option value="${t.id}">${t.icon} ${esc(t.name)}</option>`).join('')
-      + (db.mine.length ? '<option value="mine">⭐ My words</option>' : '');
+    sel.innerHTML = (ES ? '<option value="all">All topics</option>' : '') + TOPICS.map((t) => `<option value="${t.id}">${t.icon} ${esc(t.name)}</option>`).join('')
+      + (db.mine.length || !ES ? '<option value="mine">⭐ My library</option>' : '');
     sel.value = [...sel.options].some((o) => o.value === cur) ? cur : (topic || 'all');
   }
 
@@ -241,7 +251,7 @@
     .sort((a, b) => a.k - b.k).map((x) => x.w);
   $('cStart').addEventListener('click', () => {
     const list = wordsOf($('cTopic').value);
-    if (!list.length) { $('cMsg').textContent = 'There are no words in this topic yet.'; return; }
+    if (!list.length) { $('cMsg').textContent = ES ? 'There are no words in this topic yet.' : 'Your library is empty. Add words in the ➕ Add word tab first.'; return; }
     fc.queue = due(list).slice(0, +$('cCount').value);
     Object.assign(fc, { i: 0, known: 0, missed: [], total: fc.queue.length });
     hide('cSetup', 'cDone'); show('cRun');
@@ -251,7 +261,7 @@
     const w = fc.queue[fc.i];
     $('cProgress').textContent = `Card ${Math.min(fc.i + 1, fc.queue.length)} of ${fc.queue.length}`;
     $('cBar').style.width = Math.round((fc.i / fc.queue.length) * 100) + '%';
-    $('cFront').innerHTML = `<div class="fc-es" lang="es">${esc(w.es)}</div><div class="w-ipa">${esc(ipaOf(w.es))}</div><div class="w-syl" lang="es">${sylHtml(w.es)}</div>`;
+    $('cFront').innerHTML = `<div class="fc-es" lang="${L.code}">${esc(w.es)}</div><div class="w-ipa">${esc(ipaOf(w))}</div><div class="w-syl" lang="${L.code}">${sylHtml(w)}</div>`;
     $('cBack').innerHTML = `<div class="fc-en">${esc(w.en)}</div><div class="muted">${esc(topicName(w.topic))}</div>`;
     hide('cBack', 'cNo', 'cYes'); show('cShow');
     $('cShow').focus();
@@ -279,7 +289,7 @@
     hide('cRun'); show('cDone');
     $('cSummary').innerHTML = `<div class="big-num">${fc.known}/${fc.total}</div>
       <div class="line">words you knew the first time · today's vocabulary score: <b>${(db.days[todayKey()] || {}).score || 0}</b> points</div>
-      ${fc.missed.length ? `<div class="line">To practise again: ${fc.missed.map((w) => `<b lang="es">${esc(w.es)}</b> (${esc(w.en)})`).join(', ')}</div>` : ''}`;
+      ${fc.missed.length ? `<div class="line">To practise again: ${fc.missed.map((w) => `<b lang="${L.code}">${esc(w.es)}</b> (${esc(w.en)})`).join(', ')}</div>` : ''}`;
   }
   $('cAgain').addEventListener('click', () => { hide('cDone'); show('cSetup'); fillTopicSelect($('cTopic')); });
   document.addEventListener('keydown', (e) => {
@@ -293,7 +303,7 @@
   const qz = { list: [], i: 0, right: 0, missed: [], mode: 'es2en', answered: false };
   $('qStart').addEventListener('click', () => {
     const pool = wordsOf($('qTopic').value);
-    if (pool.length < 4) { $('qMsg').textContent = 'A quiz needs at least 4 words in the topic. Pick another topic or add more words.'; return; }
+    if (pool.length < 4) { $('qMsg').textContent = ES ? 'A quiz needs at least 4 words in the topic. Pick another topic or add more words.' : 'A quiz needs at least 4 words. Add more words to your library in the ➕ Add word tab.'; return; }
     Object.assign(qz, { list: shuffle(due(pool).slice(0, Math.max(+$('qCount').value * 2, 12))).slice(0, +$('qCount').value), i: 0, right: 0, missed: [], mode: $('qMode').value });
     $('qMsg').textContent = '';
     hide('qSetup', 'qDone'); show('qRun');
@@ -313,11 +323,11 @@
     $('qProgress').textContent = `Question ${qz.i + 1} of ${qz.list.length}`;
     $('qBar').style.width = Math.round((qz.i / qz.list.length) * 100) + '%';
     const m = qz.mode;
-    $('qPrompt').innerHTML = m === 'en2es' ? `<div class="q-ask">How do you say</div><div class="fc-en">${esc(w.en)}</div><div class="q-ask">in Spanish?</div>`
+    $('qPrompt').innerHTML = m === 'en2es' ? (ES ? `<div class="q-ask">How do you say</div><div class="fc-en">${esc(w.en)}</div><div class="q-ask">in Spanish?</div>` : `<div class="q-ask">Which word means</div><div class="fc-en">${esc(w.en)}</div>`)
       : m === 'listen' ? '<div class="q-ask">Listen. What does it mean?</div><div class="fc-es">🔊</div>'
-      : `<div class="q-ask">What does it mean?</div><div class="fc-es" lang="es">${esc(w.es)}</div><div class="w-ipa">${esc(ipaOf(w.es))}</div>`;
+      : `<div class="q-ask">What does it mean?</div><div class="fc-es" lang="${L.code}">${esc(w.es)}</div><div class="w-ipa">${esc(ipaOf(w))}</div>`;
     $('qListen').classList.toggle('hidden', m === 'en2es');
-    $('qOptions').innerHTML = options(w).map((o) => `<button type="button" class="q-opt" data-es="${esc(o.es)}"${m === 'en2es' ? ' lang="es"' : ''}>${esc(m === 'en2es' ? o.es : o.en)}</button>`).join('');
+    $('qOptions').innerHTML = options(w).map((o) => `<button type="button" class="q-opt" data-es="${esc(o.es)}"${m === 'en2es' ? ` lang="${L.code}"` : ''}>${esc(m === 'en2es' ? o.es : o.en)}</button>`).join('');
     $('qFeedback').textContent = ''; $('qFeedback').className = 'feedback center';
     hide('qNext');
     if (m !== 'en2es') say(w.es);
@@ -333,7 +343,7 @@
     $('qOptions').querySelectorAll('.q-opt').forEach((x) => { x.disabled = true; if (x.dataset.es === w.es) x.classList.add('right'); });
     if (!ok) b.classList.add('wrong');
     $('qFeedback').className = 'feedback center ' + (ok ? 'right' : 'wrong');
-    $('qFeedback').innerHTML = ok ? `✓ Right! <b lang="es">${esc(w.es)}</b> = ${esc(w.en)} · +${POINTS}` : `✗ <b lang="es">${esc(w.es)}</b> means “${esc(w.en)}”.`;
+    $('qFeedback').innerHTML = ok ? `✓ Right! <b lang="${L.code}">${esc(w.es)}</b> = ${esc(w.en)} · +${POINTS}` : `✗ <b lang="${L.code}">${esc(w.es)}</b> means “${esc(w.en)}”.`;
     if (qz.mode === 'en2es' || !ok) say(w.es);
     $('qNext').textContent = qz.i + 1 >= qz.list.length ? 'See results' : 'Next';
     show('qNext'); $('qNext').focus();
@@ -348,32 +358,47 @@
     const n = Math.max(1, Math.min(qz.i + (qz.answered ? 1 : 0), qz.list.length));
     $('qSummary').innerHTML = `<div class="big-num">${qz.right}/${n}</div>
       <div class="line">${Math.round((qz.right / n) * 100)}% right · today's vocabulary score: <b>${(db.days[todayKey()] || {}).score || 0}</b> points</div>
-      ${qz.missed.length ? `<div class="line">To practise again: ${qz.missed.map((w) => `<b lang="es">${esc(w.es)}</b> (${esc(w.en)})`).join(', ')}</div>` : '<div class="line">No mistakes. ¡Muy bien!</div>'}`;
+      ${qz.missed.length ? `<div class="line">To practise again: ${qz.missed.map((w) => `<b lang="${L.code}">${esc(w.es)}</b> (${esc(w.en)})`).join(', ')}</div>` : `<div class="line">No mistakes. ${ES ? '¡Muy bien!' : 'Well done!'}</div>`}`;
   }
   $('qAgain').addEventListener('click', () => { hide('qDone'); show('qSetup'); fillTopicSelect($('qTopic')); });
 
-  // ---------- My words ----------
+  // ---------- Add word + My library ----------
   function renderMine() {
+    const q = plain($('mSearch').value);
+    const list = wordsOf('mine').slice().reverse().filter((w) => !q || plain(w.es).includes(q) || plain(w.en).includes(q));
     $('mCount').textContent = db.mine.length ? `(${db.mine.length})` : '';
     $('mEmpty').classList.toggle('hidden', db.mine.length > 0);
-    $('mGrid').innerHTML = wordsOf('mine').slice().reverse().map((w) => cardHtml(w, { del: true })).join('');
+    $('mGrid').innerHTML = list.map((w) => cardHtml(w, { del: true })).join('') || (db.mine.length ? '<p class="empty">No words found.</p>' : '');
   }
   $('mGrid').addEventListener('click', onCards);
-  // Adding a word: check the spelling (LanguageTool), offer the closest Spanish words, then show a preview
-  // (sounds, syllables, English meaning from MyMemory) and add it to My words.
-  let pending = ''; // the word shown in the preview
+  $('mSearch').addEventListener('input', renderMine);
+
+  // Words on this page for the language being practised
+  $('mLabel').textContent = `${L.name} word or phrase`;
+  $('mMeanLabel').textContent = ES ? 'English meaning' : 'Meaning';
+  $('mHint').innerHTML = `Two ways to add a word: <b>type it</b> and click <b>Check word</b>, or click <b>🎙️ Say a word</b> and say it.
+    If the spelling looks wrong, you get the closest ${esc(L.name)} words to choose from. Then you see how to say it and its ${ES ? 'English meaning' : 'meaning'},
+    and you add it to your library. (The word is sent to the free LanguageTool spell checker and ${ES ? 'the MyMemory translation service' : 'the free dictionary at dictionaryapi.dev'}.)`;
+  $('lHint').innerHTML = ES
+    ? 'Pick a topic. Each word has its English meaning, its sounds (IPA, Spain) and its syllables: the <span class="stress-key">BIG</span> one is stressed. ▶ listen · 🐢 slowly · 🎙️ say it and I check it.'
+    : 'Your English words, with their meaning, their sounds (IPA, American) and their syllables: the <span class="stress-key">BIG</span> one is stressed. ▶ listen · 🐢 slowly · 🎙️ say it and I check it. The built-in topic lists are for Spanish; in English you build your own library in <b>➕ Add word</b>.';
+
+  // Adding a word: check the spelling (LanguageTool), offer the closest words, then a preview
+  // (sounds, syllables, meaning) and add it to the library.
+  let pending = ''; // the word in the preview
+  let pendingPron = null; // English: { ipa, syllables } from the dictionary
   const msg = (t) => { $('mMsg').textContent = t; };
-  function resetAdd() { pending = ''; hide('mCheck', 'mPreview'); $('mEn').value = ''; }
+  function resetAdd() { pending = ''; pendingPron = null; hide('mCheck', 'mPreview'); $('mEn').value = ''; }
   $('mEs').addEventListener('input', () => { if (pending || !$('mCheck').classList.contains('hidden')) resetAdd(); msg(''); });
 
   // -> { ok: true } | { ok: false, bad, offset, length, sugs: [...] } | { error: true }
-  async function checkSpanish(text) {
+  async function checkSpelling(text) {
     try {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
       const r = await fetch('https://api.languagetool.org/v2/check', {
         method: 'POST', signal: ctl.signal,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ text, language: 'es' })
+        body: new URLSearchParams({ text, language: ES ? 'es' : 'en-US' })
       });
       clearTimeout(t);
       if (!r.ok) return { error: true };
@@ -388,13 +413,35 @@
       return { ok: false, bad, offset: m.offset, length: m.length, sugs };
     } catch (e) { return { error: true }; }
   }
-  async function meaningOf(es) {
+  // Spanish: English meaning (MyMemory). English: a short definition (dictionaryapi.dev).
+  async function meaningOf(word) {
     try {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
-      const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(es)}&langpair=es|en`, { signal: ctl.signal });
+      if (ES) {
+        const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=es|en`, { signal: ctl.signal });
+        clearTimeout(t);
+        const tr = clean((((await r.json()) || {}).responseData || {}).translatedText || '');
+        return tr && plain(tr) !== plain(word) && !/MYMEMORY WARNING|INVALID/i.test(tr) ? tr : '';
+      }
+      const r = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word.toLowerCase()), { signal: ctl.signal });
       clearTimeout(t);
-      const tr = clean((((await r.json()) || {}).responseData || {}).translatedText || '');
-      return tr && plain(tr) !== plain(es) && !/MYMEMORY WARNING|INVALID/i.test(tr) ? tr : '';
+      if (!r.ok) return '';
+      const j = await r.json();
+      // The first two definitions of each part of speech, in the dictionary's order.
+      const cands = [];
+      let mi = 0;
+      (Array.isArray(j) ? j : []).forEach((e) => (e.meanings || []).forEach((m) => {
+        (m.definitions || []).slice(0, 2).forEach((d, k) => { if (d && d.definition) cands.push({ pos: m.partOfSpeech || '', def: d.definition.replace(/\.$/, ''), k, mi }); });
+        mi++;
+      }));
+      if (!cands.length) return '';
+      const self = new RegExp('\\b' + word.toLowerCase().replace(/[^a-z' -]/g, '') + '\\b', 'i'); // "to run" does not explain "run"
+      // the dictionary's own order, skipping definitions with a usage label, old or slang senses, or the word itself
+      const bad = (c) => /^\(/.test(c.def) || /obsolete|archaic|slang|euphemis|dated|rare\b/i.test(c.def) || self.test(c.def);
+      const score = (c) => (bad(c) ? 1000 : 0) + c.mi * 10 + c.k * 5;
+      const best = cands.sort((a, b) => score(a) - score(b))[0];
+      const def = best.def;
+      return (best.pos ? `(${best.pos}) ` : '') + (def.length > 110 ? def.slice(0, 107).replace(/\s+\S*$/, '') + '…' : def);
     } catch (e) { return ''; }
   }
 
@@ -402,24 +449,24 @@
     e.preventDefault();
     const text = clean($('mEs').value);
     if (!text) return;
-    if (!/^[¿¡]?[\p{L} '-]+[?!]?$/u.test(text)) { msg('Please type only Spanish letters (you can use the buttons for á, ñ…).'); return; }
+    if (!/^[¿¡]?[\p{L} '’-]+[?!]?$/u.test(text)) { msg(`Please type only letters${ES ? ' (you can use the buttons for á, ñ…)' : ''}.`); return; }
     const known = allWords().find((w) => plain(w.es) === plain(text) || plain(w.es.replace(/^(el|la|los|las) /, '')) === plain(text));
     if (known) {
-      msg(known.topic === 'mine' ? `“${known.es}” is already in your words.` : `“${known.es}” is already in the word lists (${topicName(known.topic)}): ${known.en}.`);
+      msg(known.topic === 'mine' ? `“${known.es}” is already in your library.` : `“${known.es}” is already in the word lists (${topicName(known.topic)}): ${known.en}.`);
       return;
     }
     resetAdd();
     const btn = $('mCheckBtn');
     btn.disabled = true; btn.textContent = 'Checking…'; msg('');
-    const res = await checkSpanish(text);
-    btn.disabled = false; btn.textContent = 'Check word';
+    const res = await checkSpelling(text);
+    btn.disabled = false; btn.textContent = '✓ Check word';
     if (res.error) { msg('Could not reach the spell checker, so the spelling was not checked.'); showPreview(text, false); return; }
     if (res.ok) { showPreview(text, true); return; }
-    // looks misspelled: offer the closest Spanish words
+    // looks misspelled: offer the closest words
     const box = $('mCheck');
-    box.innerHTML = `<p>⚠ <b lang="es">“${esc(res.bad)}”</b> doesn't look like a Spanish word.</p>
-      ${res.sugs.length ? `<p class="muted">Did you mean:</p><div class="sugs">${res.sugs.map((sg) => `<button type="button" class="btn ghost small sug" lang="es" data-sug="${esc(sg)}">${esc(sg)}</button>`).join('')}</div>`
-        : '<p class="muted">No close Spanish words found.</p>'}
+    box.innerHTML = `<p>⚠ <b lang="${L.code}">“${esc(res.bad)}”</b> doesn't look like ${ES ? 'a Spanish' : 'an English'} word.</p>
+      ${res.sugs.length ? `<p class="muted">Did you mean:</p><div class="sugs">${res.sugs.map((sg) => `<button type="button" class="btn ghost small sug" lang="${L.code}" data-sug="${esc(sg)}">${esc(sg)}</button>`).join('')}</div>`
+        : `<p class="muted">No close ${esc(L.name)} words found.</p>`}
       <div class="row" style="margin-top:0">
         <button type="button" class="btn ghost small" id="mKeep">Use “${esc(text)}” anyway</button>
         <button type="button" class="btn ghost small" id="mEdit">Edit it myself</button>
@@ -434,9 +481,41 @@
     $('mEdit').onclick = () => { hide('mCheck'); $('mEs').focus(); $('mEs').select(); };
   });
 
+  // ---- say a word: the browser turns speech into text; the learner picks the right guess ----
+  async function sayToAdd() {
+    const btn = $('mSayBtn');
+    if (!SR) { msg('Saying a word works in Chrome and Edge. Please type it instead.'); return; }
+    if (rec) { rec.stop(); return; }
+    if (canSpeak) speechSynthesis.cancel();
+    resetAdd(); msg('');
+    btn.classList.add('on'); btn.textContent = '👂 Listening… say one word';
+    const { alts, error } = await hear();
+    btn.classList.remove('on'); btn.textContent = '🎙️ Say a word';
+    const seen = new Set(), guesses = [];
+    alts.map((a) => clean(a).replace(/[.,;:!?¿¡"“”]/g, '').split(' ').slice(0, 5).join(' '))
+      .map((g) => (/^[A-Z][a-z]/.test(g) || /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]/.test(g) ? g[0].toLowerCase() + g.slice(1) : g))
+      .forEach((g) => { if (g && !seen.has(plain(g))) { seen.add(plain(g)); guesses.push(g); } });
+    const box = $('mCheck');
+    if (!guesses.length) {
+      box.innerHTML = `<p>${error === 'not-allowed' || error === 'service-not-allowed' ? 'Please allow the microphone for this site (click the lock icon in the address bar), then try again.' : 'I could not catch a word. Try again and say it clearly, or type it.'}</p>
+        <div class="row" style="margin-top:0"><button type="button" class="btn ghost small" id="sayAgain">🎙️ Try again</button></div>`;
+    } else {
+      box.innerHTML = `<p>🎙️ Did you say:</p>
+        <div class="sugs">${guesses.slice(0, 5).map((g, i) => `<button type="button" class="btn ${i ? 'ghost' : 'primary'} small heard-pick" lang="${L.code}" data-w="${esc(g)}">${esc(g)}</button>`).join('')}</div>
+        <div class="row" style="margin-top:6px"><button type="button" class="btn ghost small" id="sayAgain">🎙️ No, say it again</button>
+        <button type="button" class="btn ghost small" id="sayType">⌨️ Type it instead</button></div>`;
+    }
+    show('mCheck');
+    box.querySelectorAll('.heard-pick').forEach((b) => { b.onclick = () => { $('mEs').value = b.dataset.w; hide('mCheck'); $('mForm').requestSubmit(); }; });
+    const again = $('sayAgain'); if (again) again.onclick = sayToAdd;
+    const type = $('sayType'); if (type) type.onclick = () => { hide('mCheck'); $('mEs').focus(); };
+  }
+  $('mSayBtn').addEventListener('click', sayToAdd);
+  if (!SR) $('mSayBtn').title = 'Saying a word works in Chrome and Edge';
+
   async function showPreview(text, checked) {
-    pending = text;
-    $('pEs').textContent = text;
+    pending = text; pendingPron = null;
+    $('pEs').textContent = text; $('pEs').lang = L.code;
     $('pChecked').textContent = checked ? '✓ correct spelling' : '';
     $('pIpa').textContent = ipaOf(text);
     $('pSyl').innerHTML = sylHtml(text);
@@ -444,9 +523,19 @@
     $('mEn').placeholder = 'Looking up the meaning…';
     show('mPreview');
     say(text);
+    if (!ES && window.EN_PRON) {
+      // American pronunciation from the dictionary
+      $('pIpa').textContent = 'Looking up the pronunciation…';
+      window.EN_PRON.lookup(text).then((pr) => {
+        if (pending !== text) return;
+        pendingPron = pr;
+        $('pIpa').textContent = pr ? '/' + pr.ipa + '/' : 'No American pronunciation found for this word.';
+        $('pSyl').innerHTML = pr ? sylHtml({ es: text, syl: pr.syllables }) : '';
+      }).catch(() => { if (pending === text) $('pIpa').textContent = ''; });
+    }
     const en = await meaningOf(text);
     if (pending !== text) return;
-    $('mEn').placeholder = 'Write the English meaning';
+    $('mEn').placeholder = ES ? 'Write the English meaning' : 'Write the meaning';
     if (en && !$('mEn').value) $('mEn').value = en;
     if (!en) msg('No meaning found. Please write it yourself.');
     $('mEn').focus();
@@ -464,19 +553,21 @@
   $('mAdd').addEventListener('click', () => {
     const es = pending, en = clean($('mEn').value);
     if (!es) return;
-    if (!en) { msg('Please write the English meaning first.'); $('mEn').focus(); return; }
-    db.mine.push({ es, en, added: todayKey() });
+    if (!en) { msg(`Please write the ${ES ? 'English ' : ''}meaning first.`); $('mEn').focus(); return; }
+    const entry = { es, en, added: todayKey() };
+    if (!ES && pendingPron) { entry.ipa = pendingPron.ipa; entry.syl = pendingPron.syllables.map((x) => (x.gap ? { gap: true } : { text: x.text, stress: x.stress })); }
+    db.mine.push(entry);
     day().newWords++;
     save(); updateChip();
     resetAdd();
     $('mEs').value = '';
-    msg(`⭐ Added “${es}” to your words.`);
+    msg(`⭐ Added “${es}” to your library.`);
     renderMine();
     $('mEs').focus();
   });
   $('mCancel').addEventListener('click', () => { resetAdd(); msg(''); $('mEs').focus(); });
   // Spanish letters for an English keyboard
-  {
+  if (ES) {
     const inp = $('mEs');
     const bar = document.createElement('div');
     bar.className = 'accent-keys left';
@@ -487,6 +578,7 @@
       const a = inp.selectionStart ?? inp.value.length, z = inp.selectionEnd ?? a;
       inp.value = inp.value.slice(0, a) + b.dataset.ch + inp.value.slice(z);
       inp.setSelectionRange(a + 1, a + 1); inp.focus();
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
     });
     inp.insertAdjacentElement('afterend', bar);
   }
