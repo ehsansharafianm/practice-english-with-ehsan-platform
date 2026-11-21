@@ -4,15 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pronunciation Practice</title>
-  <meta name="description" content="American English pronunciation: phonetics, stress, voices and speaking practice — Practice English with Ehsan Platform">
+  <meta name="description" content="Pronunciation in English or Spanish: phonetics, stress, voices and speaking practice — Practice with Ehsan">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../style.css?v=20261120d">
-  <script src="../site.js?v=20261119f"></script>
+  <link rel="stylesheet" href="../style.css?v=20261120m">
+  <script src="../site.js?v=20261120m"></script>
 </head>
 <body>
   <header class="top">
     <div class="brand">
-      <h1>Pronunciation Practice</h1>
+      <h1>Pronunciation Practice</h1><span class="lang-badge L-badge"></span>
     </div>
     <div class="today-chip" title="Today's pronunciation score">
       <span class="chip-label">Today</span>
@@ -31,10 +31,10 @@
     <section id="tab-word" class="panel active">
       <div class="card">
         <h2>Add a new word</h2>
-        <p class="hint">Type a word, or click <b>Say a word</b> and say it, to see its American pronunciation: phonetics, syllables and stress. Listen to a woman's and a man's voice, then record yourself. The word is saved to My words for practice.</p>
+        <p class="hint">Type a word, or click <b>Say a word</b> and say it, to see its <span class="L-accent">American</span> pronunciation: phonetics, syllables and stress. Listen to a woman's and a man's voice, then record yourself. The word is saved to My words for practice.</p>
         <form id="wordForm" autocomplete="off" style="margin-top:4px">
           <div class="row" style="margin-top:0">
-            <input id="wordInput" type="text" required maxlength="60" placeholder="e.g. pronunciation"
+            <input id="wordInput" type="text" required maxlength="60" placeholder="e.g. pronunciation" data-ph-es="p. ej. pronunciación"
                    autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1; min-width:180px; margin-top:0">
             <button id="wordAdd" class="btn primary" type="submit">Add word</button>
             <button id="wordSay" class="btn mic-btn say-btn" type="button" title="Say the word instead of typing it">🎙️ Say a word</button>
@@ -116,7 +116,7 @@
         <div id="wEmpty" class="empty hidden">No words yet. Look up a word in "New word".</div>
         <div class="table-wrap">
           <table id="wTable" class="click-rows">
-            <thead><tr><th>Word</th><th>Phonetics (US)</th><th>Saying</th><th>Stress</th><th></th></tr></thead>
+            <thead><tr><th>Word</th><th>Phonetics</th><th>Saying</th><th>Stress</th><th></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -135,8 +135,9 @@
     </section>
   </main>
 
-  <footer class="foot"><a class="home-link" href="../">Practice English with Ehsan Platform</a> · Pronunciation Practice · US pronunciations from the CMU Pronouncing Dictionary</footer>
-  <script src="app.js?v=20261119a"></script>
-  <script type="module" src="../account.js?v=20261118b"></script>
+  <footer class="foot"><a class="home-link" href="../">Practice with Ehsan</a> · Pronunciation Practice · US English pronunciations from the CMU Pronouncing Dictionary; Spanish worked out from its spelling</footer>
+  <script src="../spanish.js?v=20261120a"></script>
+  <script src="app.js?v=20261120a"></script>
+  <script type="module" src="../account.js?v=20261120m"></script>
 </body>
 </html>

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spanish Vocabulary</title>
+  <meta name="description" content="Learn Spanish words with their English meanings and pronunciation (Spain) — Practice with Ehsan">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css?v=20261120m">
+  <script src="../site.js?v=20261120m"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Spanish Vocabulary</h1><span class="lang-badge L-badge"></span>
+    </div>
+    <div class="today-chip" title="Today's vocabulary score">
+      <span class="chip-label">Today</span>
+      <span id="chipScore">0</span><span class="chip-unit">pts</span>
+    </div>
+  </header>
+
+  <div id="notEs" class="card hidden">
+    <h2>Vocabulary is for Spanish</h2>
+    <p class="hint">Learn Spanish words with their English meanings and how to say them. Switch to Spanish to start.</p>
+    <button class="btn primary" type="button" data-set-lang="es">🇪🇸 Practise Spanish</button>
+  </div>
+
+  <nav class="tabs" id="vocabTabs" role="tablist">
+    <button class="tab active" data-tab="learn" role="tab">Learn</button>
+    <button class="tab" data-tab="cards" role="tab">Flashcards</button>
+    <button class="tab" data-tab="quiz" role="tab">Quiz</button>
+    <button class="tab" data-tab="mine" role="tab">My words</button>
+  </nav>
+
+  <main id="vocabMain">
+    <!-- ============ LEARN ============ -->
+    <section id="tab-learn" class="panel active">
+      <div class="card">
+        <div class="lib-head">
+          <h2>Learn words <span id="lCount" class="muted"></span></h2>
+          <input id="lSearch" type="search" placeholder="Search Spanish or English…" aria-label="Search words">
+        </div>
+        <p class="hint">Pick a topic. Each word has its English meaning, its sounds (IPA, Spain) and its syllables: the <span class="stress-key">BIG</span> one is stressed.
+          ▶ listen · 🐢 slowly · 🎙️ say it and I check it.</p>
+        <div id="lTopics" class="topic-chips" role="group" aria-label="Topics"></div>
+        <div id="lGrid" class="word-grid"></div>
+      </div>
+    </section>
+
+    <!-- ============ FLASHCARDS ============ -->
+    <section id="tab-cards" class="panel">
+      <div id="cSetup" class="card">
+        <h2>Flashcards</h2>
+        <p class="hint">See and hear a Spanish word, think of its meaning, then turn the card. Words you don't know come back sooner.</p>
+        <div class="row" style="align-items:center">
+          <label class="voice-pick">Topic <select id="cTopic"></select></label>
+          <label class="voice-pick">Cards <select id="cCount"><option value="10">10</option><option value="20" selected>20</option><option value="40">40</option></select></label>
+        </div>
+        <p id="cMsg" class="hint"></p>
+        <button id="cStart" class="btn primary" type="button">Start flashcards</button>
+      </div>
+      <div id="cRun" class="card hidden">
+        <div class="run-head"><span id="cProgress" class="counter"></span><button id="cQuit" class="btn ghost small" type="button">Stop</button></div>
+        <div class="progress"><div id="cBar" class="bar"></div></div>
+        <div id="cCard" class="flashcard">
+          <div id="cFront" class="fc-front"></div>
+          <div id="cBack" class="fc-back hidden"></div>
+        </div>
+        <div class="row center">
+          <button id="cListen" class="btn listen-btn" type="button">▶ Listen</button>
+          <button id="cShow" class="btn primary" type="button">Show meaning</button>
+          <button id="cNo" class="btn nav-btn hidden" type="button">✗ Not yet</button>
+          <button id="cYes" class="btn mic-btn hidden" type="button">✓ I knew it</button>
+        </div>
+      </div>
+      <div id="cDone" class="card hidden">
+        <h2>Well done!</h2>
+        <div id="cSummary" class="summary"></div>
+        <div class="row"><button id="cAgain" class="btn primary" type="button">More flashcards</button></div>
+      </div>
+    </section>
+
+    <!-- ============ QUIZ ============ -->
+    <section id="tab-quiz" class="panel">
+      <div id="qSetup" class="card">
+        <h2>Quiz</h2>
+        <p class="hint">Choose the right answer. A right answer = 10 points.</p>
+        <div class="row" style="align-items:center">
+          <label class="voice-pick">Topic <select id="qTopic"></select></label>
+          <label class="voice-pick">Type
+            <select id="qMode">
+              <option value="es2en">Spanish → English</option>
+              <option value="en2es">English → Spanish</option>
+              <option value="listen">Listen → English</option>
+            </select>
+          </label>
+          <label class="voice-pick">Questions <select id="qCount"><option value="10" selected>10</option><option value="20">20</option></select></label>
+        </div>
+        <p id="qMsg" class="hint"></p>
+        <button id="qStart" class="btn primary" type="button">Start quiz</button>
+      </div>
+      <div id="qRun" class="card hidden">
+        <div class="run-head"><span id="qProgress" class="counter"></span><button id="qQuit" class="btn ghost small" type="button">Stop</button></div>
+        <div class="progress"><div id="qBar" class="bar"></div></div>
+        <div id="qPrompt" class="q-prompt"></div>
+        <div class="row center"><button id="qListen" class="btn listen-btn" type="button">▶ Listen</button></div>
+        <div id="qOptions" class="q-options"></div>
+        <p id="qFeedback" class="feedback center" aria-live="polite"></p>
+        <div class="row center"><button id="qNext" class="btn primary hidden" type="button">Next</button></div>
+      </div>
+      <div id="qDone" class="card hidden">
+        <h2>Quiz finished</h2>
+        <div id="qSummary" class="summary"></div>
+        <div class="row"><button id="qAgain" class="btn primary" type="button">Another quiz</button></div>
+      </div>
+    </section>
+
+    <!-- ============ MY WORDS ============ -->
+    <section id="tab-mine" class="panel">
+      <div class="card">
+        <h2>Add your own words</h2>
+        <p class="hint">Write a Spanish word or short phrase and its English meaning. <b>Suggest meaning</b> asks the free MyMemory translation service for it (only the word you typed is sent).</p>
+        <form id="mForm" autocomplete="off">
+          <label>Spanish <input id="mEs" type="text" maxlength="60" required placeholder="p. ej. la mariposa" spellcheck="false"></label>
+          <label>English meaning <input id="mEn" type="text" maxlength="80" required placeholder="e.g. butterfly"></label>
+          <div class="row" style="margin-top:0">
+            <button class="btn primary" type="submit">Add word</button>
+            <button id="mSuggest" class="btn ghost" type="button">💡 Suggest meaning</button>
+          </div>
+          <p id="mMsg" class="hint" aria-live="polite"></p>
+        </form>
+      </div>
+      <div class="card">
+        <h2>My words <span id="mCount" class="muted"></span></h2>
+        <div id="mEmpty" class="empty hidden">No words yet. Add one above; your words also appear in Flashcards and Quiz (topic “My words”).</div>
+        <div id="mGrid" class="word-grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot"><a class="home-link" href="../">Practice with Ehsan</a> · Spanish Vocabulary</footer>
+  <script src="../spanish.js?v=20261120a"></script>
+  <script src="words.js?v=20261120a"></script>
+  <script src="app.js?v=20261120a"></script>
+  <script type="module" src="../account.js?v=20261120m"></script>
+</body>
+</html>

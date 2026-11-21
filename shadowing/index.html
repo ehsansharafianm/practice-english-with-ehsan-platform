@@ -4,15 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Shadowing Practice</title>
-  <meta name="description" content="Sentence shadowing with American intonation — Practice English with Ehsan Platform">
+  <meta name="description" content="Shadowing practice in English or Spanish, with YouTube videos — Practice with Ehsan">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../style.css?v=20261120d">
-  <script src="../site.js?v=20261119f"></script>
+  <link rel="stylesheet" href="../style.css?v=20261120m">
+  <script src="../site.js?v=20261120m"></script>
 </head>
 <body>
   <header class="top">
     <div class="brand">
-      <h1>Shadowing Practice</h1>
+      <h1>Shadowing Practice</h1><span class="lang-badge L-badge"></span>
     </div>
     <div class="today-chip" title="Today's shadowing score">
       <span class="chip-label">Today</span>
@@ -33,9 +33,9 @@
     <section id="tab-practise" class="panel">
       <div class="card">
         <h2>Add a sentence</h2>
-        <p class="hint">Type a sentence, or click <b>Say a sentence</b> and say it. Then listen to the American voice and repeat it right after, copying the rhythm and the melody (intonation).</p>
+        <p class="hint">Type a sentence, or click <b>Say a sentence</b> and say it. Then listen to the <span class="L-accent">American</span> voice and repeat it right after, copying the rhythm and the melody (intonation).</p>
         <form id="sForm" autocomplete="off">
-          <textarea id="sText" rows="2" maxlength="160" placeholder="e.g. Could you tell me where the station is?"></textarea>
+          <textarea id="sText" rows="2" maxlength="160" placeholder="e.g. Could you tell me where the station is?" data-ph-es="p. ej. ¿Me puedes decir dónde está la estación?"></textarea>
           <div class="s-count muted"><span id="sCount">0</span> / <span id="sMax">20</span> words</div>
           <div class="row" style="margin-top:6px">
             <button id="sAdd" class="btn primary" type="submit">Add sentence</button>
@@ -78,7 +78,7 @@
         <h2>Shadow a whole text</h2>
         <p class="hint">Paste a text or import a text file. The page splits it into sentences and goes through them on its own:
           it reads a sentence, you repeat it, you get a score, and the next sentence starts by itself.</p>
-        <textarea id="tText" rows="7" maxlength="12000" placeholder="Paste a short text here, for example a paragraph from a book, an article or a dialogue."></textarea>
+        <textarea id="tText" rows="7" maxlength="12000" placeholder="Paste a short text here, for example a paragraph from a book, an article or a dialogue." data-ph-es="Pega aquí un texto corto, por ejemplo un párrafo de un libro, un artículo o un diálogo."></textarea>
         <div class="row" style="margin-top:8px; align-items:center">
           <label class="btn ghost file-btn">📄 Import a text file (.txt)
             <input id="tFile" type="file" accept=".txt,.md,text/plain" hidden>
@@ -137,8 +137,8 @@
     <section id="tab-video" class="panel active">
       <div id="vSetup" class="card">
         <h2>Shadow a YouTube video</h2>
-        <p class="hint">Paste a link to a YouTube video in English. The page finds its sentences, plays them one by one in the speaker's real voice,
-          and you repeat each one. Videos need English captions (most have at least automatic ones).</p>
+        <p class="hint">Paste a link to a YouTube video in <span class="L-name">English</span>. The page finds its sentences, plays them one by one in the speaker's real voice,
+          and you repeat each one. Videos need <span class="L-name">English</span> captions (most have at least automatic ones).</p>
         <form id="vForm" class="row" style="margin-top:0" autocomplete="off">
           <input id="vLink" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" aria-label="YouTube link" style="flex:1; min-width:220px; margin-top:0">
           <button id="vLoad" class="btn primary" type="submit">Load video</button>
@@ -148,7 +148,7 @@
           <summary>Or paste the transcript yourself</summary>
           <p class="hint">On YouTube, open the video, click <b>…more</b> under it, then <b>Show transcript</b>. Select all the lines (with their times),
             copy them and paste them here. Also paste the video link above.</p>
-          <textarea id="vPaste" rows="6" maxlength="200000" placeholder="0:12&#10;So in college,&#10;0:15&#10;I was a government major,"></textarea>
+          <textarea id="vPaste" rows="6" maxlength="200000" placeholder="0:12&#10;So in college,&#10;0:15&#10;I was a government major," data-ph-es="0:12\nCuando era pequeño,\n0:15\nvivía en un pueblo de Galicia."></textarea>
           <div class="row"><button id="vUsePaste" class="btn ghost" type="button">Use this transcript</button></div>
         </details>
         <p class="hint" id="vResume"></p>
@@ -228,7 +228,7 @@
         <h2>Add favorite sentences</h2>
         <p class="hint">Bring the sentences you love and want to say perfectly. Put <b>one sentence on each line</b>.
           Sentences longer than 20 words are cut into shorter parts.</p>
-        <textarea id="fText" rows="5" maxlength="6000" placeholder="e.g.&#10;I'd rather be safe than sorry.&#10;Could you give me a hand with this?"></textarea>
+        <textarea id="fText" rows="5" maxlength="6000" placeholder="e.g.&#10;I'd rather be safe than sorry.&#10;Could you give me a hand with this?" data-ph-es="p. ej.\nMás vale prevenir que curar.\n¿Me echas una mano con esto?"></textarea>
         <div class="row" style="margin-top:8px">
           <button id="fAdd" class="btn primary" type="button">⭐ Add to favorites</button>
         </div>
@@ -252,8 +252,9 @@
     </section>
   </main>
 
-  <footer class="foot"><a class="home-link" href="../">Practice English with Ehsan Platform</a> · Shadowing Practice</footer>
-  <script src="app.js?v=20261120g"></script>
-  <script type="module" src="../account.js?v=20261118b"></script>
+  <footer class="foot"><a class="home-link" href="../">Practice with Ehsan</a> · Shadowing Practice</footer>
+  <script src="../spanish.js?v=20261120a"></script>
+  <script src="app.js?v=20261120h"></script>
+  <script type="module" src="../account.js?v=20261120m"></script>
 </body>
 </html>

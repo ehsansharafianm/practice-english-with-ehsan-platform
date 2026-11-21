@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="favicon.svg" width="72" alt="Practice English with Ehsan logo">
+  <img src="favicon.svg" width="72" alt="Practice with Ehsan logo">
 </p>
 
-<h1 align="center">Practice English with Ehsan</h1>
+<h1 align="center">Practice with Ehsan</h1>
 
 <p align="center">
-  <b>Shadow real English speakers from YouTube, train your American pronunciation, and build your listening and spelling — free, in your browser.</b>
+  <b>Practise English 🇬🇧 or Spanish 🇪🇸: shadow real speakers from YouTube, train your pronunciation, and build your listening and spelling — free, in your browser.</b>
 </p>
 
 <p align="center">
@@ -19,13 +19,27 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/home.png" alt="The home page of Practice English with Ehsan" width="820">
+  <img src="docs/images/home.png" alt="The home page of Practice with Ehsan" width="820">
 </p>
+
+## 🇬🇧 🇪🇸 English or Spanish
+
+Pick your language at the top of any page. Every tool works in both:
+
+| | English | Spanish |
+|---|---|---|
+| Voices and speech recognition | American English | Spain (es-ES) |
+| Shadow a YouTube video | English captions | Spanish captions |
+| Pronunciation | IPA, syllables and stress from the CMU dictionary | IPA (Spain: c/z = θ), syllables and stress worked out from the spelling |
+| Notes on each sentence | wanna/gonna, the American T, linking, weak forms | joined vowels (sinalefa), linking, the Spanish th, j and rr sounds, silent h |
+| Typing | — | one-click buttons for á é í ó ú ü ñ ¿ ¡ |
+
+Your English and Spanish words, sentences and scores are kept apart.
 
 ## 🎬 Shadow any YouTube video
 
 Shadowing means listening to a native speaker and repeating right after them, copying their rhythm and melody.
-It is one of the fastest ways to sound natural, and now you can do it with **any English video you like**.
+It is one of the fastest ways to sound natural, and now you can do it with **any English or Spanish video you like**.
 
 1. **Paste a YouTube link.** The page finds every sentence in the video, with its time.
 2. **Listen to the real speaker.** Each sentence plays straight from the video, then pauses.
@@ -49,7 +63,7 @@ Every sentence comes with notes on **how it really sounds**:
 
 ## 🗣️ Pronunciation
 
-Type or say any word to see its **American pronunciation**: phonetics (IPA), syllables and stress.
+Type or say any word to see its pronunciation: phonetics (IPA), syllables and stress, in **American English** or **Spain Spanish**.
 Hear a woman's and a man's voice, record yourself, and get feedback on the word and its stress. Then practise your saved words until they are easy.
 
 <p align="center">
@@ -65,6 +79,13 @@ and practise them, weakest first. You can also shadow a single sentence or a who
   <img src="docs/images/favorites.png" alt="A list of favorite sentences to practise" width="820">
 </p>
 
+## 📚 Spanish vocabulary
+
+About 250 everyday Spanish words from Spain in 12 topics (greetings, numbers, food, family, travel, common verbs…), each with its
+**English meaning**, its **sounds (IPA)** and its **stressed syllable**. Listen to a Spain voice, say the word and get it checked, then learn with
+**flashcards** (words you miss come back sooner) and a **quiz** (Spanish → English, English → Spanish, or just listening).
+Add your own words too: *Suggest meaning* finds the English for you.
+
 ## ✍️ Dictation
 
 Listen to a word and write it. Learn new words, review old ones (weaker words come back more often), and track your daily score.
@@ -73,7 +94,9 @@ Listen to a word and write it. Learn new words, review old ones (weaker words co
 
 | | |
 |---|---|
+| 🇬🇧 🇪🇸 **English or Spanish** | Every tool in both languages, with separate progress |
 | 🎬 **Shadow a video** | Shadow real speakers from YouTube, sentence by sentence |
+| 📚 **Spanish vocabulary** | 250 words with English meanings, IPA and stress, flashcards and a quiz |
 | 🔁 **Shadow a sentence or text** | Repeat after a natural American voice, with a melody chart of your voice |
 | ⭐ **Favorites** | Your own sentences to practise again and again |
 | 🗣️ **Pronunciation** | IPA, syllables and stress for any word, with recording and feedback |
@@ -81,7 +104,7 @@ Listen to a word and write it. Learn new words, review old ones (weaker words co
 | 🌗 **Light and dark mode** | Easy on the eyes, day and night |
 | 👩‍🏫 **Accounts and teacher dashboard** | Students sign in to keep their progress; the teacher sees everyone's scores |
 
-Free to use. Works best in **Chrome** or **Microsoft Edge** on a computer (they understand speech, and Edge has very natural American voices).
+Free to use. Works best in **Chrome** or **Microsoft Edge** on a computer (they understand speech, and Edge has very natural American and Spanish voices).
 Allow the microphone when the page asks.
 
 ---
@@ -114,12 +137,22 @@ tools/build_pron.py  Builds pronunciation/data from the CMU Pronouncing Dictiona
 shadowing/        Shadowing Practice
   index.html
   app.js
+vocabulary/       Spanish Vocabulary (only in Spanish)
+  index.html
+  app.js
+  words.js        the word lists: topic, Spanish, English
+spanish.js        Spanish (Spain) syllables, stress and IPA from the spelling, plus pronunciation tips
 worker/           Caption helper for "Shadow a video" (Cloudflare Worker)
   src/index.js
   wrangler.toml
 ```
 
 Each new practice tool gets its own folder, a card on the home page, and an entry in the `PAGES` list in `site.js`.
+
+The language being practised (English or Spanish) is chosen in the top bar and kept in `localStorage` (`pewe-lang`).
+`site.js` sets `window.PEWE_L` (voices, speech recognition, names) and `window.PEWE_KEY(key)`, which adds `-es` to
+storage keys so Spanish data never mixes with English. Signed-in students' Spanish data is saved in the `es` field
+of their account (`es.dict`, `es.pron`, `es.shad`, `es.vocab`).
 
 The pages load shared files with a version tag (`style.css?v=...`). Change the tag in all `index.html` files
 when you publish changes to those files, so browsers load the new version instead of an old saved copy.

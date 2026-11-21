@@ -1,12 +1,12 @@
-/* Caption helper for Practice English with Ehsan Platform (Cloudflare Worker).
+/* Caption helper for Practice with Ehsan (Cloudflare Worker).
  *
  * The website cannot read YouTube captions itself (the browser blocks it), so it asks this helper:
- *   GET /captions?v=<YouTube link or video id>
+ *   GET /captions?v=<YouTube link or video id>&lang=en|es   (default en)
  * Answer (JSON):
  *   { id, title, lang, auto, words: [{ t, d, w }] }   t = start (seconds), d = length (seconds), w = text
  *   or { error: "no-captions" | "not-found" | "blocked" | "bad-link" | "failed", message }
  *
- * English captions only. Captions written by people are preferred over automatic ones.
+ * Captions in the asked language only (English or Spanish). Captions written by people are preferred over automatic ones.
  * This uses YouTube's own (unofficial) player address, the same one the YouTube Android app uses,
  * so it can stop working if YouTube changes it. The website then falls back to pasting the transcript.
  */
@@ -39,16 +39,17 @@ export default {
     if (url.pathname !== '/captions') return json({ error: 'not-found', message: 'Unknown address.' }, 404);
 
     const id = videoId(url.searchParams.get('v') || '');
+    const lang = LANGS[url.searchParams.get('lang')] ? url.searchParams.get('lang') : 'en';
     if (!id) return json({ error: 'bad-link', message: 'This does not look like a YouTube link.' }, 400);
 
     // Same video again within a day: answer from Cloudflare's cache.
     const cache = caches.default;
-    const cacheKey = new Request(`https://captions.cache/${id}`);
+    const cacheKey = new Request(`https://captions.cache/${lang}/${id}`);
     const hit = await cache.match(cacheKey);
     if (hit) return json(await hit.json(), 200, { 'X-Cache': 'hit' });
 
     try {
-      const result = await getCaptions(id);
+      const result = await getCaptions(id, lang);
       if (result.error) return json(result, result.error === 'not-found' ? 404 : 422);
       ctx.waitUntil(cache.put(cacheKey, new Response(JSON.stringify(result), { headers: { 'Cache-Control': 'max-age=86400' } })));
       return json(result);
@@ -83,27 +84,39 @@ async function playerResponse(id) {
   return res.json();
 }
 
-async function getCaptions(id) {
+const LANGS = { en: { name: 'English', best: /^en(-US)?$/i }, es: { name: 'Spanish', best: /^es(-ES)?$/i } };
+
+async function getCaptions(id, lang = 'en') {
+  const L = LANGS[lang];
   const p = await playerResponse(id);
   const status = (p.playabilityStatus || {}).status;
   if (status === 'ERROR') return { error: 'not-found', message: 'This video was not found. Check the link.' };
   if (status === 'LOGIN_REQUIRED' && !p.captions) return { error: 'blocked', message: 'YouTube did not allow the captions to be read right now. Please paste the transcript instead.' };
   const tracks = (((p.captions || {}).playerCaptionsTracklistRenderer || {}).captionTracks) || [];
-  const en = tracks.filter((t) => /^en\b/i.test(t.languageCode || ''));
+  const en = tracks.filter((t) => new RegExp('^' + lang + '\\b', 'i').test(t.languageCode || ''));
   if (!en.length) {
     return tracks.length
-      ? { error: 'no-captions', none: false, message: 'This video has captions, but not in English.' }
+      ? { error: 'no-captions', none: false, message: `This video has captions, but not in ${L.name}.` }
       : { error: 'no-captions', none: true, message: 'YouTube has no captions for this video, not even automatic ones, so there are no sentences to find. This often happens with Shorts and short clips.' };
   }
-  // people-made captions first, then automatic ones; en-US before other English
-  const score = (t) => (t.kind === 'asr' ? 0 : 10) + (/^en(-US)?$/i.test(t.languageCode) ? 2 : 0);
+  // people-made captions first, then automatic ones; en-US / es-ES before other kinds of the language
+  const score = (t) => (t.kind === 'asr' ? 0 : 10) + (L.best.test(t.languageCode) ? 2 : 0);
   const track = en.sort((a, b) => score(b) - score(a))[0];
   const base = track.baseUrl.replace(/&fmt=[^&]*/g, '');
-  const res = await fetch(base + '&fmt=json3', { headers: { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9' } });
-  if (!res.ok) throw new Error('captions ' + res.status);
-  const text = await res.text();
-  if (!text.trim()) return { error: 'blocked', message: 'YouTube did not send the captions right now. Please paste the transcript instead.' };
-  const words = wordsFromJson3(JSON.parse(text));
+  const get = async (fmt) => {
+    const res = await fetch(base + (fmt ? '&fmt=' + fmt : ''), { headers: { 'User-Agent': BROWSER_UA, 'Accept-Language': 'en-US,en;q=0.9' } });
+    return res.ok ? (await res.text()).trim() : '';
+  };
+  // json3 first; YouTube sometimes sends it empty, so then try again and fall back to the srv3 (XML) format
+  let words = [];
+  let text = await get('json3');
+  if (!text) text = await get('json3');
+  if (text) words = wordsFromJson3(JSON.parse(text));
+  else {
+    const xml = (await get('srv3')) || (await get(''));
+    if (!xml) return { error: 'blocked', message: 'YouTube did not send the captions right now. Please paste the transcript instead.' };
+    words = wordsFromXml(xml);
+  }
   if (!words.length) return { error: 'no-captions', message: 'The captions of this video are empty.' };
   return {
     id,
@@ -131,6 +144,34 @@ function wordsFromJson3(data) {
       out.push({ t: round(t), d: round(Math.max(0.05, end - t)), w: decode(w) });
     });
   });
+  return out;
+}
+// srv3: <p t="ms" d="ms">text or <s t="offset ms">word</s>…</p>; the older format: <text start="s" dur="s">text</text>
+function wordsFromXml(xml) {
+  const out = [];
+  const ps = [...xml.matchAll(/<p\b[^>]*\bt="(\d+)"[^>]*?(?:\bd="(\d+)")?[^>]*>([\s\S]*?)<\/p>/g)];
+  ps.forEach(([, t, d, body]) => {
+    const start = +t / 1000, dur = (+d || 0) / 1000;
+    const segs = [...body.matchAll(/<s\b[^>]*?(?:\bt="(\d+)")?[^>]*>([\s\S]*?)<\/s>/g)];
+    if (!segs.length) {
+      const w = decode(body.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+      if (w) out.push({ t: round(start), d: round(Math.max(0.05, dur)), w });
+      return;
+    }
+    segs.forEach(([, off, txt], i) => {
+      const w = decode(txt.replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
+      if (!w) return;
+      const s = start + (+off || 0) / 1000;
+      const nx = segs[i + 1] && segs[i + 1][1] !== undefined ? start + +segs[i + 1][1] / 1000 : start + dur;
+      out.push({ t: round(s), d: round(Math.max(0.05, nx - s)), w });
+    });
+  });
+  if (!out.length) {
+    [...xml.matchAll(/<text\b[^>]*\bstart="([\d.]+)"[^>]*?(?:\bdur="([\d.]+)")?[^>]*>([\s\S]*?)<\/text>/g)].forEach(([, st, du, txt]) => {
+      const w = decode(decode(txt)).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (w) out.push({ t: round(+st), d: round(Math.max(0.05, +du || 2)), w });
+    });
+  }
   return out;
 }
 const round = (x) => Math.round(x * 100) / 100;

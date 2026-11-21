@@ -1,4 +1,4 @@
-/* Shadowing Practice — Practice English with Ehsan Platform
+/* Shadowing Practice — Practice with Ehsan (English or Spanish: window.PEWE_L, set by ../site.js)
  * The learner adds a sentence (typed or said), listens to an American voice, then repeats it.
  * The page checks the words (browser speech recognition, Chrome/Edge), the melody at the end of the
  * sentence (pitch from the recording), how lively the voice is, and the speed. Everything except the
@@ -11,7 +11,10 @@
 
   const MAX_WORDS = 20;
   const POINTS = 10;          // per try with a match of 80% or more
-  const STORE_KEY = 'shadowing-v1';
+  const L = window.PEWE_L || { code: 'en', name: 'English', bcp: 'en-US', accent: 'American', voiceRe: /^en[-_]US/i, anyVoiceRe: /^en\b/i };
+  const ES = L.code === 'es';
+  const lk = (k) => (window.PEWE_KEY ? window.PEWE_KEY(k) : k); // storage key for this language
+  const STORE_KEY = lk('shadowing-v1');
   let storeKey = STORE_KEY;
   let cloudOK = false;
 
@@ -37,7 +40,7 @@
     if (window.PEWE && window.PEWE.user && cloudOK && window.PEWE.saveShad) window.PEWE.saveShad(db).catch((e) => console.warn('Cloud save failed', e));
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && cloudTimer) flushCloud(); });
-  const key = (t) => clean(t).toLowerCase().replace(/[^a-z0-9' ]/g, '');
+  const key = (t) => clean(t).toLowerCase().replace(/[^\p{L}\p{N}' ]/gu, '');
   function merge(a, b) {
     const out = { sentences: (a.sentences || []).map((s) => ({ ...s })), days: JSON.parse(JSON.stringify(a.days || {})) };
     (b.sentences || []).forEach((s) => {
@@ -70,19 +73,31 @@
   const findSentence = (t) => db.sentences.find((s) => key(s.text) === key(t));
 
   // ---------- words, stress and the expected melody ----------
-  const FUNCTION = new Set(('a an the and or but if so as at by for from in into of off on onto out over to up with about than then that this these those ' +
+  const FUNCTION_EN = new Set(('a an the and or but if so as at by for from in into of off on onto out over to up with about than then that this these those ' +
     'there here is are was were be been being am do does did have has had will would shall should can could may might must ' +
     'i you he she it we they me him her us them my your his its our their it\'s i\'m you\'re he\'s she\'s we\'re they\'re ' +
     'i\'ll you\'ll we\'ll i\'ve you\'ve we\'ve i\'d you\'d a.m. p.m. just').split(' '));
-  const WH = new Set(['what', 'where', 'when', 'why', 'who', 'whom', 'whose', 'which', 'how']);
-  const AUX = new Set(['do', 'does', 'did', 'is', 'are', 'was', 'were', 'am', 'can', 'could', 'will', 'would', 'should', 'shall', 'have', 'has', 'had', 'may', 'might', 'must',
+  // Spanish words that are normally unstressed in a sentence (articles, short prepositions, pronouns, que, y…)
+  const FUNCTION_ES = new Set(('el la los las lo un una unos unas al del a de en con por para sin sobre entre hasta desde hacia ' +
+    'y e o u ni que pero si se me te le les nos os mi mis tu tus su sus nuestro nuestra como cuando donde porque aunque mientras ' +
+    'es son era fue soy eres ha he has han tan').split(' '));
+  const FUNCTION = ES ? FUNCTION_ES : FUNCTION_EN;
+  const WH = new Set(ES ? ['qué', 'quién', 'quiénes', 'cuál', 'cuáles', 'cómo', 'dónde', 'adónde', 'cuándo', 'cuánto', 'cuánta', 'cuántos', 'cuántas', 'por qué']
+    : ['what', 'where', 'when', 'why', 'who', 'whom', 'whose', 'which', 'how']);
+  const AUX = new Set(ES ? [] : ['do', 'does', 'did', 'is', 'are', 'was', 'were', 'am', 'can', 'could', 'will', 'would', 'should', 'shall', 'have', 'has', 'had', 'may', 'might', 'must',
     "don't", "doesn't", "didn't", "isn't", "aren't", "wasn't", "weren't", "can't", "couldn't", "won't", "wouldn't", "shouldn't", "haven't", "hasn't"]);
-  const core = (w) => w.toLowerCase().replace(/[‘’]/g, "'").replace(/^[^a-z0-9']+|[^a-z0-9']+$/g, '');
+  const core = (w) => w.toLowerCase().replace(/[‘’]/g, "'").replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, '');
   const wordsOf = (t) => clean(t).split(' ').filter((w) => core(w));
+  // Does the sentence start with a question word (what, where… / qué, dónde, por qué…)?
+  function startsWh(t) {
+    const ws = clean(t).split(' ').map(core);
+    return WH.has(ws[0]) || (ES && WH.has(ws[0] + ' ' + (ws[1] || '')));
+  }
   function expectedTune(text) {
     const t = clean(text), first = core(t.split(' ')[0] || '');
     if (/\?\s*$/.test(t)) {
-      if (WH.has(first)) return { end: 'fall', why: 'This is a <b>wh- question</b> (what, where, how…): the voice <b>falls</b> at the end ↘.' };
+      if (startsWh(t)) return { end: 'fall', why: ES ? 'This is a <b>question with a question word</b> (qué, dónde, cómo…): the voice <b>falls</b> at the end ↘.' : 'This is a <b>wh- question</b> (what, where, how…): the voice <b>falls</b> at the end ↘.' };
+      if (ES) return { end: 'rise', why: 'This is a <b>yes/no question</b> (¿…?): the voice <b>rises</b> at the end ↗. In Spanish only the melody turns a sentence into a question.' };
       return { end: 'rise', why: AUX.has(first) ? 'This is a <b>yes/no question</b>: the voice <b>rises</b> at the end ↗.' : 'This is a question: the voice <b>rises</b> at the end ↗.' };
     }
     if (/[,;:]\s*$/.test(t) || !/[.!?]["'”’)\]]*\s*$/.test(t)) return { end: 'rise', soft: true, why: 'This part continues the sentence: keep your voice <b>up</b> (or a small rise ↗). Don\'t let it fall yet.' };
@@ -106,11 +121,20 @@
 
   // ---------- voices ----------
   const canSpeak = 'speechSynthesis' in window;
-  const FEMALE = /\b(female|woman|zira|aria|jenny|michelle|ana|emma|ava|allison|samantha|susan|joanna|salli|ivy|kendra|nancy|sara|jane|amber|ashley|cora|elizabeth|monica|google us english)\b/i;
-  const quality = (v) => (/natural|online|neural/i.test(v.name) ? 3 : 0) + (/google/i.test(v.name) ? 1 : 0);
-  const VOICE_KEY = 'pewe-shadow-voice';
-  function usVoices() { return canSpeak ? speechSynthesis.getVoices().filter((v) => /^en[-_]US/i.test(v.lang)).sort((a, b) => quality(b) - quality(a) || a.name.localeCompare(b.name)) : []; }
-  const label = (v) => v.name.replace(/^(Microsoft|Google)\s+/, '').replace(/\s*-\s*English.*$/, '').replace(/\s*\(.*\)\s*$/, '') + (FEMALE.test(v.name) ? ' (woman)' : ' (man)') + (quality(v) >= 3 ? ' ★ natural' : '');
+  const FEMALE = /\b(female|woman|zira|aria|jenny|michelle|ana|emma|ava|allison|samantha|susan|joanna|salli|ivy|kendra|nancy|sara|jane|amber|ashley|cora|elizabeth|monica|google us english|helena|laura|elvira|abril|estrella|irene|laia|lia|triana|vera|ximena|mónica|marisol|paulina|lucía|lucia|conchita|google español|flo|sandy|shelley|grandma)\b/i;
+  // natural voices first; the Mac's joke voices (Grandma, Bubbles…) last
+  const NOVELTY = /\b(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox)\b/i;
+  const quality = (v) => (/natural|online|neural/i.test(v.name) ? 3 : 0) + (/google/i.test(v.name) ? 1 : 0) - (NOVELTY.test(v.name) ? 5 : 0);
+  const VOICE_KEY = lk('pewe-shadow-voice');
+  // Voices for the language being practised (Spain Spanish: es-ES first, any Spanish voice if there is none).
+  function usVoices() {
+    if (!canSpeak) return [];
+    const all = speechSynthesis.getVoices();
+    let list = all.filter((v) => L.voiceRe.test(v.lang));
+    if (!list.length) list = all.filter((v) => L.anyVoiceRe.test(v.lang));
+    return list.sort((a, b) => quality(b) - quality(a) || a.name.localeCompare(b.name));
+  }
+  const label = (v) => v.name.replace(/^(Microsoft|Google)\s+/, '').replace(/\s*-\s*(English|Spanish).*$/, '').replace(/\s*\(.*\)\s*$/, '') + (FEMALE.test(v.name) ? ' (woman)' : ' (man)') + (quality(v) >= 3 ? ' ★ natural' : '');
   function fillVoices() {
     const sel = $('voiceSel'), list = usVoices();
     let saved = ''; try { saved = localStorage.getItem(VOICE_KEY) || ''; } catch (e) { /* ignore */ }
@@ -120,6 +144,8 @@
     const natural = list.some((v) => quality(v) >= 3);
     $('voiceNote').innerHTML = !canSpeak ? 'This browser cannot read sentences aloud. Try Microsoft Edge or Chrome.'
       : natural ? 'Voices marked ★ are natural voices with the most human-like intonation.'
+      : !list.length ? `This device has no ${L.name} voice. Open this page in <b>Microsoft Edge</b>, which has free natural ${L.name} voices.`
+      : ES ? 'Tip: for the most natural Spanish voices and intonation, open this page in <b>Microsoft Edge</b>. It has free natural voices from Spain (Elvira, Álvaro…).'
       : 'Tip: for the most natural American voices and intonation, open this page in <b>Microsoft Edge</b>. It has free natural voices (Aria, Jenny, Guy, Andrew…).';
   }
   if (canSpeak) { speechSynthesis.addEventListener('voiceschanged', fillVoices); speechSynthesis.getVoices(); }
@@ -133,7 +159,7 @@
       const u = new SpeechSynthesisUtterance(clean(text));
       const v = usVoices().find((x) => x.name === $('voiceSel').value) || usVoices()[0];
       if (v) u.voice = v;
-      u.lang = 'en-US';
+      u.lang = L.bcp;
       u.rate = $('slowBox').checked ? 0.7 : 0.95;
       const spans = [...document.querySelectorAll(box + ' .sw')];
       const mark = (i) => spans.forEach((s) => s.classList.toggle('now', +s.dataset.s <= i && i < +s.dataset.e));
@@ -187,7 +213,7 @@
       }
       if (SR) {
         recog = new SR();
-        recog.lang = 'en-US'; recog.interimResults = false; recog.continuous = false; recog.maxAlternatives = 1;
+        recog.lang = L.bcp; recog.interimResults = false; recog.continuous = false; recog.maxAlternatives = 1;
         recog.onresult = (e) => { heard = Array.from(e.results).map((r) => r[0].transcript).join(' '); };
         recog.onerror = (e) => { error = e.error; };
         recog.onend = () => { recogDone = true; try { if (rec && rec.state !== 'inactive') rec.stop(); } catch (e) { recDone = true; } finish(); };
@@ -209,11 +235,16 @@
   function tidy(t) {
     t = clean(t);
     if (!t) return t;
-    t = t[0].toUpperCase() + t.slice(1);
-    if (!/[.?!]$/.test(t)) {
+    const lead = (t.match(/^[¿¡"“'(]*/) || [''])[0];
+    t = lead + (t[lead.length] || '').toUpperCase() + t.slice(lead.length + 1);
+    if (!/[.?!]["”')]*$/.test(t)) {
       const first = core(t.split(' ')[0]);
-      t += WH.has(first) || AUX.has(first) ? '?' : '.';
+      const q = startsWh(t) || AUX.has(first) || /^¿/.test(t);
+      t += q ? '?' : '.';
     }
+    // Spanish questions and exclamations open with ¿ / ¡
+    if (ES && /\?["”')]*$/.test(t) && !/¿/.test(t)) t = '¿' + t;
+    if (ES && /!["”')]*$/.test(t) && !/¡/.test(t)) t = '¡' + t;
     return t;
   }
   function message(html) { $('sMsg').innerHTML = html; $('sMsg').classList.remove('hidden'); }
@@ -330,8 +361,10 @@
   });
 
   // ---------- comparing the words ----------
-  const NUM = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
-  const EXPAND = { "i'm": 'i am', "you're": 'you are', "we're": 'we are', "they're": 'they are', "it's": 'it is', "that's": 'that is', "he's": 'he is', "she's": 'she is',
+  const NUM = ES ? ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce']
+    : ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+  const plain = (w) => w.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Spanish: está = esta when comparing words
+  const EXPAND = ES ? {} : { "i'm": 'i am', "you're": 'you are', "we're": 'we are', "they're": 'they are', "it's": 'it is', "that's": 'that is', "he's": 'he is', "she's": 'she is',
     "don't": 'do not', "doesn't": 'does not', "didn't": 'did not', "can't": 'can not', 'cannot': 'can not', "won't": 'will not', "isn't": 'is not', "aren't": 'are not',
     "i'll": 'i will', "you'll": 'you will', "we'll": 'we will', "i've": 'i have', "you've": 'you have', "we've": 'we have', "i'd": 'i would', "let's": 'let us', "what's": 'what is', "where's": 'where is' };
   // each target word -> list of comparable tokens
@@ -339,6 +372,7 @@
     return wordsOf(text).map((w) => {
       let c = core(w);
       if (/^\d+$/.test(c) && +c < NUM.length) c = NUM[+c];
+      if (ES) c = plain(c);
       return (EXPAND[c] || c).split(' ');
     });
   }
@@ -361,6 +395,7 @@
   // Words that sound the same count as right ("sea" heard as "see"), using the Pronunciation page's US dictionary.
   const shards = {};
   async function sounds(word) {
+    if (ES) return window.ES_PRON ? [window.ES_PRON.key(word)] : [];
     const w = word.toLowerCase(), k = w[0] >= 'a' && w[0] <= 'z' ? w[0] : '0';
     if (!shards[k]) shards[k] = fetch('../pronunciation/data/' + k + '.txt').then((r) => (r.ok ? r.text() : '')).catch(() => '').then((t) => {
       const m = new Map(); t.split(String.fromCharCode(10)).forEach((line) => { const i = line.indexOf(String.fromCharCode(9)); if (i > 0) m.set(line.slice(0, i), line.slice(i + 1).split(';').map((v) => v.replace(/[.\d]/g, '').replace(/ +/g, ' ').trim())); });
@@ -480,7 +515,7 @@
       if (!heard) tips.push('I could not understand the sentence. Listen again, then say it a bit slower and clearer.');
       else if (missed.length) {
         tips.push(`Words I did not hear clearly: ${missed.map((w) => `<b>${esc(w)}</b>`).join(', ')}.`);
-        if (missed.some((w) => FUNCTION.has(w))) tips.push('Small words (to, the, a, of…) are short and quick in English, but they are still said. Link them to the next word.');
+        if (missed.some((w) => FUNCTION.has(w))) tips.push(ES ? 'Small words (de, la, que, en…) are short and quick in Spanish, but they are still said. Join them to the next word.' : 'Small words (to, the, a, of…) are short and quick in English, but they are still said. Link them to the next word.');
       } else tips.push('✓ All the words were clear.');
     }
     let chart = '';
@@ -494,7 +529,7 @@
       else if (tune.soft) tips.push('Your voice fell here ↘, so it sounds like the end. This part goes on: keep your voice <b>up</b>.');
       else if (tune.end === 'fall') tips.push(a.end === 'rise' ? 'Your voice went <b>up</b> at the end ↗. In this sentence it should go <b>down</b> ↘ on the last stressed word, to sound finished and sure.' : 'Your voice stayed <b>flat</b> at the end. Let it <b>fall</b> ↘ on the last stressed word.');
       else tips.push(a.end === 'fall' ? 'Your voice went <b>down</b> at the end ↘. For a yes/no question, let it go <b>up</b> ↗ on the last word.' : 'Your voice stayed <b>flat</b> at the end. For this question, let it go <b>up</b> ↗ on the last word.');
-      if (a.range < 1.6) tips.push('Your voice sounds quite <b>flat</b>. American English goes up and down more: make the <b>bold</b> words higher and louder.');
+      if (a.range < 1.6) tips.push(`Your voice sounds quite <b>flat</b>. ${ES ? 'Spanish' : 'American English'} goes up and down more: make the <b>bold</b> words higher and louder.`);
       parts += 2;
       const wps = toks.length / Math.max(0.5, a.seconds);
       if (wps < 1.5) { score += 1; tips.push('You spoke quite <b>slowly</b>. Try to keep up with the voice and link the words together.'); }
@@ -524,7 +559,7 @@
   // read the sentence, record the learner, score it, then move on to the next one.
   // =====================================================
   const MAX_TEXT_SENTENCES = 60;
-  const ABBR = /\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|etc|e\.g|i\.e|U\.S|U\.K|a\.m|p\.m|No)\.$/i;
+  const ABBR = /\b(Mr|Mrs|Ms|Dr|Dra|Prof|Sr|Sra|Srta|Jr|St|vs|etc|e\.g|i\.e|U\.S|U\.K|a\.m|p\.m|No|Ud|Uds|Vd|Vds|pág|aprox|Avda|núm)\.$/i;
   // Split a text into sentences; long ones (more than MAX_WORDS) are cut at commas, or into even parts.
   function splitText(text) {
     const out = [];
@@ -795,7 +830,7 @@
   // =====================================================
   // The caption helper's address (see worker/). On this computer, a helper started with "npm run dev" is used.
   const CAPTIONS_API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'http://127.0.0.1:8787' : 'https://pewe-captions.practice-english-ehsan.workers.dev';
-  const VIDEO_KEY = 'pewe-shadow-video';
+  const VIDEO_KEY = lk('pewe-shadow-video');
   const vid = { id: '', title: '', auto: false, sents: [], i: 0, results: [], busy: false, run: 0 };
   let yt = null, ytReady = null;
 
@@ -841,7 +876,8 @@
     const merged = [];
     out.forEach((b) => { const last = merged[merged.length - 1]; if (last && b.length < 3 && last.length + b.length <= MAX_WORDS + 4 && b[0].t - last[last.length - 1].e < 0.8) last.push(...b); else merged.push(b); });
     return merged.map((b, k) => {
-      let text = b.map((x) => x.w).join(' ').replace(/\bi\b/g, 'I').replace(/\bi'(m|ll|ve|d)\b/gi, "I'$1");
+      let text = b.map((x) => x.w).join(' ');
+      if (!ES) text = text.replace(/\bi\b/g, 'I').replace(/\bi'(m|ll|ve|d)\b/gi, "I'$1");
       text = punctuated ? text[0].toUpperCase() + text.slice(1) : tidy(text.replace(/[,;:]+$/, ""));
       const nextStart = merged[k + 1] ? merged[k + 1][0].t : Infinity;
       return { text, start: Math.max(0, b[0].t - 0.2), end: Math.min(b[b.length - 1].e + 0.35, nextStart + 0.1) };
@@ -881,6 +917,12 @@
   const WEAK = { and: 'n', to: 'tə', of: 'əv', for: 'fər', can: 'kən', you: 'yə', your: 'yər', a: 'ə', the: 'thə', at: 'ət', from: 'frəm', was: 'wəz', are: 'ər' };
   const VOWEL = /^[aeiou]/i;
   function speechNotes(text) {
+    if (ES) {
+      // Spanish: linking between words, then the letters that sound different from English
+      if (!window.ES_PRON) return [];
+      const notes = window.ES_PRON.linkNotes(text);
+      return notes.concat(window.ES_PRON.soundTips(wordsOf(text), 5 - notes.length)).slice(0, 5);
+    }
     const notes = [], low = clean(text).toLowerCase();
     REDUCE.forEach(([re, from, to]) => { if (re.test(low)) notes.push(`<b>${esc(from)}</b> usually sounds like <span class="say">“${esc(to)}”</span> in fast American speech.`); });
     const ws = wordsOf(text).map(core);
@@ -980,13 +1022,13 @@
     $('vLoad').disabled = true; vMsg('Finding the sentences…');
     let data = null;
     try {
-      const r = await fetch(`${CAPTIONS_API}/captions?v=${encodeURIComponent(id)}`);
+      const r = await fetch(`${CAPTIONS_API}/captions?v=${encodeURIComponent(id)}&lang=${L.code}`);
       data = await r.json();
     } catch (err) { data = { error: 'failed', message: 'Could not reach the caption helper.' }; }
     $('vLoad').disabled = false;
     if (data.error === 'no-captions') {
       $('vPasteBox').open = false;
-      return vMsg(`${esc(data.message || 'This video has no English captions.')}<br>Please try another video. Tip: on YouTube, videos with captions show a <b>CC</b> button, and in search you can choose <b>Filters → Subtitles/CC</b>.`);
+      return vMsg(`${esc(data.message || `This video has no ${L.name} captions.`)}<br>Please try another video. Tip: on YouTube, videos with captions show a <b>CC</b> button, and in search you can choose <b>Filters → Subtitles/CC</b>.`);
     }
     if (data.error) { $('vPasteBox').open = true; return vMsg(`${esc(data.message || 'Could not get the captions.')} You can paste the transcript below instead.`); }
     startVideo({ id, title: data.title, auto: data.auto, sents: buildSentences(data.words) });

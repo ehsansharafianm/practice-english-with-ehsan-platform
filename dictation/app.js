@@ -1,4 +1,4 @@
-/* Dictation Practice — Practice English with Ehsan Platform
+/* Dictation Practice — Practice with Ehsan (English or Spanish: window.PEWE_L, set by ../site.js)
  * Guests: data is stored in this browser (localStorage).
  * Signed-in students: data is also saved to their account (see ../account.js),
  * so it follows them to any device and the teacher can see their scores.
@@ -8,7 +8,9 @@
 
   const TRIES_PER_NEW_WORD = 10;
   const POINTS_PER_CORRECT = 10;
-  const STORE_KEY = 'dictation-practice-v1';       // guest data
+  const L = window.PEWE_L || { code: 'en', name: 'English', bcp: 'en-US', voiceRe: /^en[-_]US/i, anyVoiceRe: /^en\b/i };
+  const ES = L.code === 'es';
+  const STORE_KEY = window.PEWE_KEY ? window.PEWE_KEY('dictation-practice-v1') : 'dictation-practice-v1'; // guest data (Spanish: its own key)
   let storeKey = STORE_KEY;                         // becomes STORE_KEY + ':' + uid when signed in
   let cloudOK = false;                              // true once the account's data loaded
 
@@ -84,6 +86,9 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
   const norm = (s) => s.replace(/[‘’]/g, "'").trim().replace(/\s+/g, ' ').toLowerCase();
+  const plain = (s) => norm(s).normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // without accent marks
+  // "✗" message: says so when only the accent marks are wrong (Spanish)
+  const wrongMsg = (typed, text, lead) => (plain(typed) === plain(text) ? `✗ Almost! Check the accent marks: it is "${text}"` : `✗ ${lead} "${text}"`);
   const pct = (c, t) => (t ? Math.round((c / t) * 100) : 0);
   const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -113,14 +118,40 @@
     if (!canSpeak || !text) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-US';
+    u.lang = L.bcp;
     u.rate = 0.8;
-    const v = window.speechSynthesis.getVoices().find((x) => x.lang && x.lang.startsWith('en'));
+    const all = window.speechSynthesis.getVoices();
+    const NOVELTY = /\b(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox)\b/i;
+    const real = all.filter((x) => !NOVELTY.test(x.name));
+    const v = real.find((x) => L.voiceRe.test(x.lang || '')) || real.find((x) => L.anyVoiceRe.test(x.lang || '')) || all.find((x) => L.anyVoiceRe.test(x.lang || ''));
     if (v) u.voice = v;
     window.speechSynthesis.speak(u);
   }
   if (!canSpeak) {
     ['learnSpeak', 'reviewSpeak'].forEach((id) => $(id).classList.add('hidden'));
+  }
+
+  // ---------- Spanish letters for an English keyboard ----------
+  // Buttons under each answer box type á é í ó ú ü ñ ¿ ¡ where the cursor is.
+  if (ES) {
+    ['newWord', 'learnInput', 'reviewInput'].forEach((id) => {
+      const inp = $(id);
+      const bar = document.createElement('div');
+      bar.className = 'accent-keys';
+      bar.setAttribute('aria-label', 'Spanish letters');
+      bar.innerHTML = ['á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ', '¿', '¡'].map((c) => `<button type="button" tabindex="-1" data-ch="${c}">${c}</button>`).join('');
+      bar.addEventListener('mousedown', (e) => e.preventDefault()); // keep the cursor in the box
+      bar.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-ch]');
+        if (!b || inp.disabled) return;
+        const a = inp.selectionStart ?? inp.value.length, z = inp.selectionEnd ?? a;
+        inp.value = inp.value.slice(0, a) + b.dataset.ch + inp.value.slice(z);
+        inp.setSelectionRange(a + 1, a + 1);
+        inp.focus();
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      inp.insertAdjacentElement('afterend', bar);
+    });
   }
 
   // ---------- live colouring while typing ----------
@@ -160,7 +191,7 @@
 
   function loadDict() {
     if (dict.loading) return dict.loading;
-    dict.loading = fetch('words.txt')
+    dict.loading = fetch(ES ? 'words-es.txt' : 'words.txt') // no Spanish list yet: the check is skipped
       .then((r) => { if (!r.ok) throw new Error('no list'); return r.text(); })
       .then((txt) => {
         dict.list = txt.split(/\r?\n/).filter(Boolean);
@@ -210,8 +241,8 @@
   // Returns the words in the text that are not in the dictionary.
   function unknownWords(text) {
     return text.split(/[\s\-–—]+/)
-      .map((t) => t.replace(/[‘’]/g, "'").replace(/^[^a-zA-Z']+|[^a-zA-Z']+$/g, ''))
-      .filter((t) => t && /^[a-zA-Z']+$/.test(t))
+      .map((t) => t.replace(/[‘’]/g, "'").replace(/^[^\p{L}']+|[^\p{L}']+$/gu, ''))
+      .filter((t) => t && /^[\p{L}']+$/u.test(t))
       .filter((t) => !dict.set.has(t.toLowerCase()) && !dict.set.has(t.toLowerCase().replace(/'s$/, '')));
   }
 
@@ -228,7 +259,7 @@
     const word = bad[0];
     const sugs = suggest(word.toLowerCase()).map((s) => matchCase(word, s));
     box.innerHTML = `
-      <p>⚠ <b>"${esc(word)}"</b> doesn't look like a correct English spelling.</p>
+      <p>⚠ <b>"${esc(word)}"</b> doesn't look like a correct ${L.name} spelling.</p>
       ${sugs.length ? `<p class="muted">Did you mean:</p><div class="sugs">${sugs.map((s) => `<button type="button" class="btn ghost small sug" data-sug="${esc(s)}">${esc(s)}</button>`).join('')}</div>`
                     : '<p class="muted">No suggestions found.</p>'}
       <div class="row" style="margin-top:0">
@@ -237,7 +268,7 @@
       </div>`;
     show('spellBox');
     box.querySelectorAll('.sug').forEach((b) => b.addEventListener('click', () => {
-      const re = new RegExp(`(^|[^a-zA-Z'])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-zA-Z'])`);
+      const re = new RegExp(`(^|[^\\p{L}'])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^\\p{L}'])`, 'u');
       $('newWord').value = $('newWord').value.replace(re, (m, pre) => pre + b.dataset.sug);
       hide('spellBox');
       $('learnForm').requestSubmit(); // re-check (phrases may have more than one problem), then start
@@ -324,7 +355,7 @@
     inp.disabled = true;
     const fb = $('learnFeedback');
     fb.className = 'feedback ' + (ok ? 'right' : 'wrong');
-    fb.textContent = ok ? '✓ Correct!' : `✗ Not quite — it is "${learn.text}"`;
+    fb.textContent = ok ? '✓ Correct!' : wrongMsg(inp.value, learn.text, 'Not quite — it is');
     learn.waiting = true;
     $('learnCheck').textContent = learn.results.length >= TRIES_PER_NEW_WORD ? 'Finish' : 'Next';
     // update dots
@@ -451,7 +482,7 @@
     inp.disabled = true;
     const fb = $('reviewFeedback');
     fb.className = 'feedback ' + (ok ? 'right' : 'wrong');
-    fb.textContent = ok ? '✓ Correct!' : `✗ The answer is "${w.text}"`;
+    fb.textContent = ok ? '✓ Correct!' : wrongMsg(inp.value, w.text, 'The answer is');
     if (!ok) { $('reviewTarget').textContent = w.text; $('reviewTarget').classList.remove('masked'); }
     review.waiting = true;
     $('reviewCheck').textContent = review.i + 1 >= review.queue.length ? 'Finish' : 'Next';

@@ -1,5 +1,6 @@
-/* Pronunciation Practice — Practice English with Ehsan Platform
- * American pronunciations (phonetics, syllables, stress) come from the CMU Pronouncing Dictionary,
+/* Pronunciation Practice — Practice with Ehsan (English or Spanish: window.PEWE_L, set by ../site.js)
+ * Spanish (Spain): syllables, stress and IPA are worked out from the spelling by ../spanish.js.
+ * English: American pronunciations (phonetics, syllables, stress) come from the CMU Pronouncing Dictionary,
  * split by first letter in data/*.txt. Format: word<TAB>syllables;variant  (syllables split by ".",
  * phones in ARPAbet, vowel digit = stress: 1 main, 2 secondary, 0 none).
  * Meanings and real recordings come from the free dictionaryapi.dev, when it has the word.
@@ -10,15 +11,19 @@
 
   const POINTS = 10;
   const SAY_TRIES = 3;                      // attempts per word in "Say the word"
-  const STORE_KEY = 'pronunciation-v1';
-  const DICT_KEY = 'dictation-practice-v1'; // Dictation's own saved words (read only)
+  const L = window.PEWE_L || { code: 'en', name: 'English', bcp: 'en-US', region: 'US', accent: 'American', voiceRe: /^en[-_]US/i, anyVoiceRe: /^en\b/i };
+  const ES = L.code === 'es';
+  const REGION = ES ? 'Spain' : 'US', REGION_CODE = ES ? 'ES' : 'US';
+  const lk = (k) => (window.PEWE_KEY ? window.PEWE_KEY(k) : k); // storage key for this language
+  const STORE_KEY = lk('pronunciation-v1');
+  const DICT_KEY = lk('dictation-practice-v1'); // Dictation's own saved words (read only)
   let storeKey = STORE_KEY;
   let cloudOK = false;
   let cloudDictWords = [];
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const norm = (s) => String(s || '').replace(/[‘’]/g, "'").toLowerCase().replace(/[^a-z' -]/g, ' ').replace(/\s+/g, ' ').trim();
+  const norm = (s) => String(s || '').replace(/[‘’]/g, "'").toLowerCase().normalize('NFC').replace(ES ? /[^a-záéíóúüñ -]/g : /[^a-z' -]/g, ' ').replace(/\s+/g, ' ').trim();
   const pct = (c, t) => (t ? Math.round((c / t) * 100) : 0);
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -111,6 +116,7 @@
   async function prons(word) {
     const w = norm(word);
     if (!w) return [];
+    if (ES) { const sy = window.ES_PRON ? window.ES_PRON.syllables(w) : []; return sy.length ? [sy] : []; } // Spanish: from the spelling
     const m = await shard(w[0]);
     const raw = m.get(w) || m.get(w.replace(/'/g, '')) || [];
     return raw.map((v) => v.split('.').map((s) => {
@@ -129,13 +135,14 @@
     if (b === 'ER') return s === '0' ? 'ɚ' : 'ɝ';
     return IPA[b] || '';
   }
-  const ipaSyl = (syl) => syl.phones.map(ipaPhone).join('');
+  const ipaSyl = (syl) => (syl.ipa !== undefined ? syl.ipa : syl.phones.map(ipaPhone).join(''));
   const ipaWord = (sy) => sy.map((s) => (sy.length > 1 && s.stress === 1 ? 'ˈ' : sy.length > 1 && s.stress === 2 ? 'ˌ' : '') + ipaSyl(s)).join('');
 
   // "Sounds like" spelling for learners, e.g. pruh · nun · see · AY · shuhn
   const RES = { B: 'b', CH: 'ch', D: 'd', DH: 'dh', F: 'f', G: 'g', HH: 'h', JH: 'j', K: 'k', L: 'l', M: 'm', N: 'n', NG: 'ng', P: 'p',
     R: 'r', S: 's', SH: 'sh', T: 't', TH: 'th', V: 'v', W: 'w', Y: 'y', Z: 'z', ZH: 'zh' };
   function respell(syl) {
+    if (syl.text !== undefined) return syl.stress === 1 ? syl.text.toUpperCase() : syl.text; // Spanish: the written syllable
     const ph = syl.phones, vi = ph.findIndex((p) => /\d$/.test(p));
     const onset = vi > 0, coda = vi >= 0 && vi < ph.length - 1;
     const out = ph.map((p, i) => {
@@ -158,6 +165,7 @@
   const extraCache = {};
   function extra(word) {
     const w = norm(word);
+    if (ES) return Promise.resolve({ audioUS: '', ipa: '', meaning: '', pos: '', example: '' }); // the free dictionary is English only
     if (!extraCache[w]) {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 6000);
       extraCache[w] = fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(w), { signal: ctl.signal })
@@ -182,10 +190,16 @@
 
   // ---------- voices ----------
   const canSpeak = 'speechSynthesis' in window;
-  const FEMALE = /\b(female|woman|zira|aria|jenny|michelle|ana|emma|ava|allison|samantha|susan|victoria|karen|kimberly|joanna|salli|ivy|kendra|nancy|sara|jane|amber|ashley|cora|elizabeth|monica|libby|sonia|natasha|google us english)\b/i;
-  const MALE = /\b(male|man|david|mark|guy|davis|tony|jason|andrew|brian|eric|christopher|roger|steffan|ryan|thomas|daniel|alex|fred|aaron|tom|ralph|matthew|justin|joey|kevin|jacob|brandon|google uk english male)\b/i;
-  function usVoices() { return canSpeak ? speechSynthesis.getVoices().filter((v) => /^en[-_]US/i.test(v.lang)) : []; }
-  const quality = (v) => (/natural|online|neural/i.test(v.name) ? 3 : 0) + (/google/i.test(v.name) ? 1 : 0);
+  const FEMALE = /\b(female|woman|zira|aria|jenny|michelle|ana|emma|ava|allison|samantha|susan|victoria|karen|kimberly|joanna|salli|ivy|kendra|nancy|sara|jane|amber|ashley|cora|elizabeth|monica|libby|sonia|natasha|google us english|helena|laura|elvira|abril|estrella|irene|laia|lia|triana|vera|ximena|mónica|marisol|paulina|lucía|lucia|conchita|google español|flo|sandy|shelley|grandma)\b/i;
+  const MALE = /\b(male|man|david|mark|guy|davis|tony|jason|andrew|brian|eric|christopher|roger|steffan|ryan|thomas|daniel|alex|fred|aaron|tom|ralph|matthew|justin|joey|kevin|jacob|brandon|google uk english male|pablo|alvaro|álvaro|jorge|arnau|dario|darío|elias|elías|nil|saul|saúl|teo|juan|diego|enrique|carlos|raul|raúl|eddy|reed|rocko|grandpa)\b/i;
+  // Voices for the language being practised (Spain Spanish: es-ES first, any Spanish voice if there is none)
+  function usVoices() {
+    if (!canSpeak) return [];
+    const all = speechSynthesis.getVoices(), list = all.filter((v) => L.voiceRe.test(v.lang));
+    return list.length ? list : all.filter((v) => L.anyVoiceRe.test(v.lang));
+  }
+  const NOVELTY = /\b(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox)\b/i;
+  const quality = (v) => (/natural|online|neural/i.test(v.name) ? 3 : 0) + (/google/i.test(v.name) ? 1 : 0) - (NOVELTY.test(v.name) ? 5 : 0);
   function voiceFor(gender) {
     const list = usVoices();
     const isF = (v) => FEMALE.test(v.name) && !/\bmale\b/i.test(v.name);
@@ -202,7 +216,7 @@
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     const v = voiceFor(gender);
-    u.lang = 'en-US';
+    u.lang = L.bcp;
     if (v.voice) u.voice = v.voice;
     u.pitch = v.pitch;
     u.rate = slow ? 0.55 : 0.9;
@@ -211,9 +225,9 @@
   function voiceNote() {
     if (!canSpeak) return 'This browser cannot read words aloud. Try Chrome or Edge.';
     const f = voiceFor('female'), m = voiceFor('male');
-    if (!f.voice) return 'No American English voice found on this device.';
+    if (!f.voice) return `No ${ES ? 'Spanish' : 'American English'} voice found on this device. Microsoft Edge has free natural ${L.name} voices.`;
     const name = (x) => x.voice.name.replace(/^(Microsoft|Google)\s+/, '').replace(/\s*[-–(].*$/, '');
-    let s = `Voices: woman — ${esc(name(f))}${f.fallback ? ' (pitch raised)' : ''}, man — ${esc(name(m))}${m.fallback ? ' (pitch lowered; this device has no man\'s US voice)' : ''}.`;
+    let s = `Voices: woman — ${esc(name(f))}${f.fallback ? ' (pitch raised)' : ''}, man — ${esc(name(m))}${m.fallback ? ` (pitch lowered; this device has no man's ${REGION} voice)` : ''}.`;
     if (f.fallback || m.fallback) s += ' Microsoft Edge has more natural voices.';
     return s;
   }
@@ -257,7 +271,7 @@
       let recogEnded = !SR;
       if (SR) {
         recog = new SR();
-        recog.lang = 'en-US'; recog.maxAlternatives = 5; recog.interimResults = false; recog.continuous = false;
+        recog.lang = L.bcp; recog.maxAlternatives = 5; recog.interimResults = false; recog.continuous = false;
         recog.onresult = (e) => { const alts = Array.from(e.results[0] || []); heard = alts.map((a) => a.transcript); confidence = alts[0] ? alts[0].confidence || 0 : 0; };
         recog.onerror = (e) => { error = e.error; };
         recog.onend = () => { recogEnded = true; stopAll(); finish(); };
@@ -276,7 +290,7 @@
     if (alts.some((a) => a === t || a.replace(/[ -]/g, '') === t.replace(/[ -]/g, ''))) return true;
     if (t.includes(' ')) return false;
     try {
-      const flat = (vs) => vs.map((v) => v.map((s) => s.phones.join(' ')).join(' ').replace(/\d/g, ''));
+      const flat = (vs) => vs.map((v) => (ES ? v.map((s) => s.ipa).join('').replace(/β/g, 'b').replace(/ð/g, 'd').replace(/ɣ/g, 'ɡ') : v.map((s) => s.phones.join(' ')).join(' ').replace(/\d/g, '')));
       const tp = flat(await prons(t));
       for (const a of alts) {
         if (a.includes(' ')) continue;
@@ -497,16 +511,16 @@
       <div class="pr-head">
         <div>
           <div class="pr-word">${esc(clean)}</div>
-          <div class="ipa">${fullIpa ? esc(fullIpa) : '<span class="muted">No phonetics found</span>'} <span class="flag">US</span></div>
+          <div class="ipa">${fullIpa ? esc(fullIpa) : '<span class="muted">No phonetics found</span>'} <span class="flag">${REGION_CODE}</span></div>
         </div>
       </div>
       ${known ? `<div class="syls">${parts.map((p) => sylChips(p.variants[0])).join('<span class="syl-gap"></span>')}</div>
         <p class="hint">${parts.length === 1 ? stressSentence(parts[0].variants[0]) : 'Stress is shown on each word.'}
         The <span class="stress-key">BIG</span> syllable is stressed: say it louder, longer and a little higher.</p>${alts}`
-        : `<p class="hint">This word is not in the American pronunciation list${ex.ipa ? ', so the phonetics above come from an online dictionary' : ''}. You can still listen to it.</p>`}
+        : `<p class="hint">This word is not in the ${ES ? 'Spanish' : 'American'} pronunciation list${ex.ipa ? ', so the phonetics above come from an online dictionary' : ''}. You can still listen to it.</p>`}
       <div class="voice-row">
-        <button class="btn primary" type="button" data-say="female">👩 Woman (US)</button>
-        <button class="btn primary" type="button" data-say="male">👨 Man (US)</button>
+        <button class="btn primary" type="button" data-say="female">👩 Woman (${REGION})</button>
+        <button class="btn primary" type="button" data-say="male">👨 Man (${REGION})</button>
         <label class="check slow-check"><input type="checkbox" id="slowBox" ${slow ? 'checked' : ''}> 🐢 Slow</label>
       </div>
       <p class="hint voice-note">${voiceNote()}</p>
@@ -563,6 +577,7 @@
   // ---------- spell check (same English word list as Dictation) ----------
   const wl = { list: null, set: null, loading: null };
   function loadList() {
+    if (ES) return Promise.resolve(false); // Spanish: every spelling has a pronunciation, so no English word list
     if (!wl.loading) {
       wl.loading = fetch('../dictation/words.txt').then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); })
         .then((t) => { wl.list = t.split(String.fromCharCode(10)).map((x) => x.trim()).filter(Boolean); wl.set = new Set(wl.list); return true; })
@@ -661,7 +676,7 @@
     return new Promise((resolve) => {
       const r = new SR();
       let alts = [], error = '';
-      r.lang = 'en-US'; r.maxAlternatives = 6; r.interimResults = false; r.continuous = false;
+      r.lang = L.bcp; r.maxAlternatives = 6; r.interimResults = false; r.continuous = false;
       r.onresult = (e) => { alts = Array.from(e.results[0] || []).map((a) => a.transcript); };
       r.onerror = (e) => { error = e.error; };
       r.onend = () => { sayRec = null; resolve({ alts, error }); };

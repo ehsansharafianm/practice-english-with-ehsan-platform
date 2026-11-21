@@ -43,32 +43,42 @@ async function start() {
   const userDoc = () => F.doc(fs, 'users', api.user.uid);
   const displayName = () => api.user.displayName || pendingName || (api.user.email || 'Student').split('@')[0];
 
+  // English data lives at the top of the student's document (words, days, pron, shad), as before.
+  // Spanish data lives in the "es" field: es.dict {words, days}, es.pron, es.shad, es.vocab.
+  // load() gives each tool the data of the language being practised, in the English shape.
+  const isEs = () => window.PEWE_LANG === 'es';
   api.load = async () => {
     const snap = await F.getDoc(userDoc());
-    return snap.exists() ? snap.data() : null;
+    if (!snap.exists()) return null;
+    const d = snap.data();
+    if (!isEs()) return d;
+    const es = d.es || {};
+    return { ...d, words: (es.dict || {}).words || [], days: (es.dict || {}).days || {}, pron: es.pron || null, shad: es.shad || null, vocab: es.vocab || null };
+  };
+  // Saves one tool's data for the language being practised.
+  const put = (field, value) => {
+    const base = { name: displayName(), email: api.user.email || '', lastActive: F.serverTimestamp() };
+    const data = isEs() ? { ...base, es: { [field]: value } } : { ...base, ...(field === 'dict' ? value : { [field]: value }) };
+    return F.setDoc(userDoc(), data, { merge: true });
   };
   api.save = async (db) => {
     if (!api.user) return;
-    const clean = JSON.parse(JSON.stringify({ words: db.words || [], days: db.days || {} }));
-    await F.setDoc(userDoc(), {
-      name: displayName(),
-      email: api.user.email || '',
-      lastActive: F.serverTimestamp(),
-      words: clean.words,
-      days: clean.days
-    }, { merge: true });
+    await put('dict', JSON.parse(JSON.stringify({ words: db.words || [], days: db.days || {} })));
   };
   // Pronunciation Practice keeps its own words and daily scores in the "pron" field.
   api.savePron = async (p) => {
     if (!api.user) return;
-    const clean = JSON.parse(JSON.stringify({ words: p.words || [], days: p.days || {} }));
-    await F.setDoc(userDoc(), { name: displayName(), email: api.user.email || '', lastActive: F.serverTimestamp(), pron: clean }, { merge: true });
+    await put('pron', JSON.parse(JSON.stringify({ words: p.words || [], days: p.days || {} })));
   };
   // Shadowing Practice keeps its sentences and daily scores in the "shad" field.
   api.saveShad = async (d) => {
     if (!api.user) return;
-    const clean = JSON.parse(JSON.stringify({ sentences: d.sentences || [], days: d.days || {} }));
-    await F.setDoc(userDoc(), { name: displayName(), email: api.user.email || '', lastActive: F.serverTimestamp(), shad: clean }, { merge: true });
+    await put('shad', JSON.parse(JSON.stringify({ sentences: d.sentences || [], days: d.days || {} })));
+  };
+  // Vocabulary (Spanish words) keeps the learner's progress and own words in es.vocab.
+  api.saveVocab = async (v) => {
+    if (!api.user) return;
+    await put('vocab', JSON.parse(JSON.stringify({ words: v.words || {}, mine: v.mine || [], days: v.days || {} })));
   };
   api.listStudents = async () => {
     const snap = await F.getDocs(F.collection(fs, 'users'));
