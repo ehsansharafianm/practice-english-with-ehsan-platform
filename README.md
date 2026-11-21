@@ -85,8 +85,7 @@ and practise them, weakest first. You can also shadow a single sentence or a who
 **Add word:** type a word or just **say it** 🎙️. If the spelling looks wrong you get the closest real words to choose from; then you see
 its **sounds (IPA)**, its **stressed syllable** and its **meaning** (found for you), and it goes into **your library**, in English or in Spanish.
 Learn your words with **flashcards** (words you miss come back sooner) and a **quiz** (word → meaning, meaning → word, or just listening).
-
-Spanish also comes with about 250 everyday words from Spain in 12 topics (greetings, numbers, food, family, travel, common verbs…).
+Vocabulary has no ready-made lists: it is only the words you add.
 
 ## ✍️ Dictation
 
@@ -98,7 +97,7 @@ Listen to a word and write it. Learn new words, review old ones (weaker words co
 |---|---|
 | 🇬🇧 🇪🇸 **English or Spanish** | Every tool in both languages, with separate progress |
 | 🎬 **Shadow a video** | Shadow real speakers from YouTube, sentence by sentence |
-| 📚 **Vocabulary** | Your own word library (type or say a word), meanings, IPA and stress, flashcards and a quiz; 250 ready Spanish words |
+| 📚 **Vocabulary** | Your own word library (type or say a word), meanings, IPA and stress, flashcards and a quiz |
 | 🔁 **Shadow a sentence or text** | Repeat after a natural American voice, with a melody chart of your voice |
 | ⭐ **Favorites** | Your own sentences to practise again and again |
 | 🗣️ **Pronunciation** | IPA, syllables and stress for any word, with recording and feedback |
@@ -139,10 +138,9 @@ tools/build_pron.py  Builds pronunciation/data from the CMU Pronouncing Dictiona
 shadowing/        Shadowing Practice
   index.html
   app.js
-vocabulary/       Vocabulary: word lists (Spanish), the learner's own library (both languages), flashcards, quiz
+vocabulary/       Vocabulary: the learner's own word library (one per language), flashcards, quiz
   index.html
   app.js
-  words.js        the word lists: topic, Spanish, English
 spanish.js        Spanish (Spain) syllables, stress and IPA from the spelling, plus pronunciation tips
 english.js        American English IPA and syllables from the CMU dictionary files (pronunciation/data)
 worker/           Caption helper for "Shadow a video" (Cloudflare Worker)

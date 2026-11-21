@@ -1,5 +1,6 @@
 /* Vocabulary — Practice with Ehsan (English or Spanish: window.PEWE_L, set by ../site.js)
- * Spanish: built-in word lists (words.js) with English meanings, IPA and stress (../spanish.js), a Spain voice.
+ * Only the learner's own words: their library, one per language (there are no built-in word lists).
+ * Spanish: English meanings, IPA and stress (../spanish.js), a Spain voice.
  * English: the learner's own library, with American IPA and stress (../english.js) and English definitions.
  * Learn (word cards), Flashcards (words you miss come back sooner), Quiz (4 choices), Add word (type or say a word:
  * LanguageTool checks the spelling and suggests the closest words; MyMemory (Spanish) or dictionaryapi.dev (English)
@@ -28,9 +29,9 @@
   const hide = (...ids) => ids.forEach((id) => $(id).classList.add('hidden'));
 
   // ---------- words ----------
-  // The built-in topic lists are Spanish; in English the learner's own library is the word list.
-  const TOPICS = ES ? (window.VOCAB_TOPICS || []) : [];
-  const BUILT = ES ? (window.VOCAB_WORDS || []).map(([topic, es, en]) => ({ es, en, topic })) : [];
+  // No built-in word lists: the learner's own library is the word list, in both languages.
+  const TOPICS = [];
+  const BUILT = [];
   const topicName = (id) => (id === 'mine' ? 'My library' : id === 'all' ? 'All topics' : (TOPICS.find((t) => t.id === id) || {}).name || id);
 
   // ---------- storage ----------
@@ -215,7 +216,7 @@
     else if (act === 'mic') sayIt(b, card.querySelector('.w-res'), w);
     else if (act === 'del') {
       const own = db.mine.some((m) => m.es === w.es);
-      if (!confirm(own ? `Remove “${w.es}” from your library?` : `Remove “${w.es}” from your library? Its progress is cleared; it stays in its topic list.`)) return;
+      if (!confirm(`Remove “${w.es}” from your library?`)) return;
       db.mine = db.mine.filter((m) => m.es !== w.es); delete db.words[w.es]; save(); renderMine();
     }
   }
@@ -223,9 +224,10 @@
   // ---------- Learn ----------
   // My library comes first: it is the topic shown until the learner picks another one.
   let topic = null, topicPicked = false;
-  const hasLibrary = () => libraryWords().length > 0 || !ES;
+  const hasLibrary = () => true;
   const defaultTopic = () => (hasLibrary() ? 'mine' : TOPICS[0] ? TOPICS[0].id : 'mine');
   function renderTopics() {
+    $('lTopics').classList.toggle('hidden', !TOPICS.length); // only My library: no topic chips
     if (!topicPicked || !topic) topic = defaultTopic();
     const ts = TOPICS.map((t) => ({ ...t, words: wordsOf(t.id) }));
     if (hasLibrary()) ts.unshift({ id: 'mine', name: 'My library', icon: '📚', words: wordsOf('mine') });
@@ -252,7 +254,7 @@
   function fillTopicSelect(sel) {
     const cur = sel.dataset.picked ? sel.value : '';
     sel.innerHTML = (hasLibrary() ? `<option value="mine">📚 My library (${libraryWords().length})</option>` : '')
-      + (ES ? '<option value="all">All topics</option>' : '') + TOPICS.map((t) => `<option value="${t.id}">${t.icon} ${esc(t.name)}</option>`).join('');
+      + TOPICS.map((t) => `<option value="${t.id}">${t.icon} ${esc(t.name)}</option>`).join('');
     sel.value = cur && [...sel.options].some((o) => o.value === cur) ? cur : (hasLibrary() ? 'mine' : 'all');
   }
   ['cTopic', 'qTopic'].forEach((id) => $(id).addEventListener('change', () => { $(id).dataset.picked = '1'; }));
@@ -267,7 +269,7 @@
     .sort((a, b) => a.k - b.k).map((x) => x.w);
   $('cStart').addEventListener('click', () => {
     const list = wordsOf($('cTopic').value);
-    if (!list.length) { $('cMsg').textContent = ES ? 'There are no words in this topic yet.' : 'Your library is empty. Add words in the ➕ Add word tab first.'; return; }
+    if (!list.length) { $('cMsg').textContent = 'Your library is empty. Add words in the ➕ Add word tab first.'; return; }
     fc.queue = due(list).slice(0, +$('cCount').value);
     Object.assign(fc, { i: 0, known: 0, missed: [], total: fc.queue.length });
     hide('cSetup', 'cDone'); show('cRun');
@@ -278,7 +280,7 @@
     $('cProgress').textContent = `Card ${Math.min(fc.i + 1, fc.queue.length)} of ${fc.queue.length}`;
     $('cBar').style.width = Math.round((fc.i / fc.queue.length) * 100) + '%';
     $('cFront').innerHTML = `<div class="fc-es" lang="${L.code}">${esc(w.es)}</div><div class="w-ipa">${esc(ipaOf(w))}</div><div class="w-syl" lang="${L.code}">${sylHtml(w)}</div>`;
-    $('cBack').innerHTML = `<div class="fc-en">${esc(w.en)}</div><div class="muted">${esc(topicName(w.topic))}</div>`;
+    $('cBack').innerHTML = `<div class="fc-en">${esc(w.en)}</div>`;
     hide('cBack', 'cNo', 'cYes'); show('cShow');
     $('cShow').focus();
     say(w.es);
@@ -319,7 +321,7 @@
   const qz = { list: [], i: 0, right: 0, missed: [], mode: 'es2en', answered: false };
   $('qStart').addEventListener('click', () => {
     const pool = wordsOf($('qTopic').value);
-    if (pool.length < 4) { $('qMsg').textContent = ES ? 'A quiz needs at least 4 words in the topic. Pick another topic or add more words.' : 'A quiz needs at least 4 words. Add more words to your library in the ➕ Add word tab.'; return; }
+    if (pool.length < 4) { $('qMsg').textContent = 'A quiz needs at least 4 words. Add more words to your library in the ➕ Add word tab.'; return; }
     Object.assign(qz, { list: shuffle(due(pool).slice(0, Math.max(+$('qCount').value * 2, 12))).slice(0, +$('qCount').value), i: 0, right: 0, missed: [], mode: $('qMode').value });
     $('qMsg').textContent = '';
     hide('qSetup', 'qDone'); show('qRun');
@@ -416,9 +418,8 @@
   $('mHint').innerHTML = `Two ways to add a word: <b>type it</b> and click <b>Check word</b>, or click <b>🎙️ Say a word</b> and say it.
     If the spelling looks wrong, you get the closest ${esc(L.name)} words to choose from. Then you see how to say it and its ${ES ? 'English meaning' : 'meaning'},
     and you add it to your library. (The word is sent to the free LanguageTool spell checker and ${ES ? 'the MyMemory translation service' : 'the free dictionary at dictionaryapi.dev'}.)`;
-  $('lHint').innerHTML = ES
-    ? 'Pick a topic. Each word has its English meaning, its sounds (IPA, Spain) and its syllables: the <span class="stress-key">BIG</span> one is stressed. ▶ listen · 🐢 slowly · 🎙️ say it and I check it.'
-    : 'Your English words, with their meaning, their sounds (IPA, American) and their syllables: the <span class="stress-key">BIG</span> one is stressed. ▶ listen · 🐢 slowly · 🎙️ say it and I check it. The built-in topic lists are for Spanish; in English you build your own library in <b>➕ Add word</b>.';
+  $('lHint').innerHTML = `Your ${esc(L.name)} words, with their meaning, their sounds (IPA, ${ES ? 'Spain' : 'American'}) and their syllables: the <span class="stress-key">BIG</span> one is stressed.
+    ▶ listen · 🐢 slowly · 🎙️ say it and I check it. Add new words in <b>➕ Add word</b>.`;
 
   // Adding a word: check the spelling (LanguageTool), offer the closest words, then a preview
   // (sounds, syllables, meaning) and add it to the library.
@@ -653,7 +654,14 @@
     if (name === 'library') renderMine();
   }
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
-  function refresh() { updateChip(); showTab(curTab); }
+  // Progress of words that are no longer in the library (the old built-in lists) is dropped.
+  function prune() {
+    const keep = new Set(db.mine.map((m) => m.es));
+    let changed = false;
+    Object.keys(db.words).forEach((k) => { if (!keep.has(k)) { delete db.words[k]; changed = true; } });
+    if (changed) save();
+  }
+  function refresh() { prune(); updateChip(); showTab(curTab); }
   window.__peweVocabTest = { saidRight, ipaOf, wordsOf, db: () => db }; // for developer checks
   refresh();
 })();
