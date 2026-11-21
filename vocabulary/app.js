@@ -89,8 +89,13 @@
     save(); updateChip();
   }
   const learned = (w) => ((db.words[w.es] || {}).box || 0) >= 3;
-  const allWords = () => BUILT.concat(db.mine.map((m) => ({ es: m.es, en: m.en, ipa: m.ipa, syl: m.syl, topic: 'mine' })));
-  const wordsOf = (topic) => (topic === 'all' ? allWords() : allWords().filter((w) => w.topic === topic));
+  const mineWords = () => db.mine.map((m) => ({ es: m.es, en: m.en, ipa: m.ipa, syl: m.syl, topic: 'mine', added: m.added || '' }));
+  // every word once (a built-in word I also added counts once)
+  const allWords = () => { const mine = mineWords(); return BUILT.filter((w) => !mine.some((m) => m.es === w.es)).concat(mine); };
+  const practised = (w) => !!(db.words[w.es] || {}).last;
+  // My library = the words I added + every word I have practised (Learn, Flashcards, Quiz)
+  const libraryWords = () => { const mine = mineWords(); return mine.concat(BUILT.filter((w) => practised(w) && !mine.some((m) => m.es === w.es))); };
+  const wordsOf = (topic) => (topic === 'all' ? allWords() : topic === 'mine' ? libraryWords() : BUILT.filter((w) => w.topic === topic));
 
   // ---------- sounds ----------
   // Sounds: Spanish from the spelling (ES_PRON); English from the American dictionary (EN_PRON), saved with the word.
@@ -178,6 +183,7 @@
     mark(w, ok);
     out.innerHTML = ok ? `<p class="feedback right">✓ I heard “${esc(alts[0])}”. +${POINTS}</p>` : `<p class="feedback wrong">✗ I heard “${esc(alts[0])}”. Listen ▶ and try again.</p>`;
     if (curTab === 'learn') renderTopics();
+    if (curTab === 'library') renderMine();
   }
 
   // ---------- word cards (Learn and My words) ----------
@@ -208,7 +214,8 @@
     else if (act === 'slow') say(w.es, true);
     else if (act === 'mic') sayIt(b, card.querySelector('.w-res'), w);
     else if (act === 'del') {
-      if (!confirm(`Delete “${w.es}” from your library?`)) return;
+      const own = db.mine.some((m) => m.es === w.es);
+      if (!confirm(own ? `Remove “${w.es}” from your library?` : `Remove “${w.es}” from your library? Its progress is cleared; it stays in its topic list.`)) return;
       db.mine = db.mine.filter((m) => m.es !== w.es); delete db.words[w.es]; save(); renderMine();
     }
   }
@@ -216,8 +223,8 @@
   // ---------- Learn ----------
   let topic = TOPICS[0] ? TOPICS[0].id : 'mine';
   function renderTopics() {
-    const ts = TOPICS.map((t) => ({ ...t, words: BUILT.filter((w) => w.topic === t.id) }));
-    if (db.mine.length || !ES) ts.push({ id: 'mine', name: 'My library', icon: '⭐', words: wordsOf('mine') });
+    const ts = TOPICS.map((t) => ({ ...t, words: wordsOf(t.id) }));
+    if (libraryWords().length || !ES) ts.push({ id: 'mine', name: 'My library', icon: '📚', words: wordsOf('mine') });
     $('lTopics').innerHTML = ts.map((t) => {
       const n = t.words.length, k = t.words.filter(learned).length;
       return `<button type="button" class="topic-chip${t.id === topic ? ' on' : ''}" data-topic="${t.id}" aria-pressed="${t.id === topic}">
@@ -240,7 +247,7 @@
   function fillTopicSelect(sel) {
     const cur = sel.value;
     sel.innerHTML = (ES ? '<option value="all">All topics</option>' : '') + TOPICS.map((t) => `<option value="${t.id}">${t.icon} ${esc(t.name)}</option>`).join('')
-      + (db.mine.length || !ES ? '<option value="mine">⭐ My library</option>' : '');
+      + (libraryWords().length || !ES ? '<option value="mine">📚 My library</option>' : '');
     sel.value = [...sel.options].some((o) => o.value === cur) ? cur : (topic || 'all');
   }
 
@@ -363,15 +370,36 @@
   $('qAgain').addEventListener('click', () => { hide('qDone'); show('qSetup'); fillTopicSelect($('qTopic')); });
 
   // ---------- Add word + My library ----------
+  // ---- My library tab ----
+  let libShow = 'all';
   function renderMine() {
+    const lib = libraryWords();
+    const groups = { all: lib, added: mineWords(), practised: lib.filter(practised), learned: lib.filter(learned) };
+    const names = { all: 'All', added: 'Added by me', practised: 'Practised', learned: '✓ Learned' };
+    $('libFilter').innerHTML = Object.keys(names).map((k) => `<button type="button" class="topic-chip${k === libShow ? ' on' : ''}" data-show="${k}" aria-pressed="${k === libShow}">${names[k]} <small>${groups[k].length}</small></button>`).join('');
     const q = plain($('mSearch').value);
-    const list = wordsOf('mine').slice().reverse().filter((w) => !q || plain(w.es).includes(q) || plain(w.en).includes(q));
-    $('mCount').textContent = db.mine.length ? `(${db.mine.length})` : '';
-    $('mEmpty').classList.toggle('hidden', db.mine.length > 0);
-    $('mGrid').innerHTML = list.map((w) => cardHtml(w, { del: true })).join('') || (db.mine.length ? '<p class="empty">No words found.</p>' : '');
+    // newest first: words I added (by date), then practised words (by last practice)
+    const when = (w) => Math.max((db.words[w.es] || {}).last || 0, w.added ? Date.parse(w.added) || 0 : 0);
+    const list = groups[libShow].slice().sort((a, b) => when(b) - when(a)).filter((w) => !q || plain(w.es).includes(q) || plain(w.en).includes(q));
+    $('mCount').textContent = lib.length ? `(${lib.length})` : '';
+    $('mEmpty').classList.toggle('hidden', lib.length > 0);
+    $('libCards').disabled = $('libQuiz').disabled = !lib.length;
+    $('mGrid').innerHTML = list.map((w) => cardHtml(w, { del: true })).join('') || (lib.length ? '<p class="empty">No words here yet.</p>' : '');
   }
   $('mGrid').addEventListener('click', onCards);
   $('mSearch').addEventListener('input', renderMine);
+  $('libFilter').addEventListener('click', (e) => { const b = e.target.closest('[data-show]'); if (b) { libShow = b.dataset.show; renderMine(); } });
+  // start flashcards or a quiz with the library
+  function practiseLibrary(kind) {
+    showTab(kind);
+    const sel = $(kind === 'cards' ? 'cTopic' : 'qTopic');
+    sel.value = 'mine';
+    hide(kind === 'cards' ? 'cDone' : 'qDone'); show(kind === 'cards' ? 'cSetup' : 'qSetup');
+    $(kind === 'cards' ? 'cStart' : 'qStart').click();
+  }
+  $('libCards').addEventListener('click', () => practiseLibrary('cards'));
+  $('libQuiz').addEventListener('click', () => practiseLibrary('quiz'));
+  $('libAdd').addEventListener('click', () => { showTab('mine'); $('mEs').focus(); });
 
   // Words on this page for the language being practised
   $('mLabel').textContent = `${L.name} word or phrase`;
@@ -388,8 +416,8 @@
   let pending = ''; // the word in the preview
   let pendingPron = null; // English: { ipa, syllables } from the dictionary
   const msg = (t) => { $('mMsg').textContent = t; };
-  function resetAdd() { pending = ''; pendingPron = null; hide('mCheck', 'mPreview'); $('mEn').value = ''; }
-  $('mEs').addEventListener('input', () => { if (pending || !$('mCheck').classList.contains('hidden')) resetAdd(); msg(''); });
+  function resetAdd() { pending = ''; pendingPron = null; hide('mCheck', 'mPreview', 'mDone'); $('mEn').value = ''; }
+  $('mEs').addEventListener('input', () => { if (pending || !$('mCheck').classList.contains('hidden') || !$('mDone').classList.contains('hidden')) resetAdd(); msg(''); });
 
   // -> { ok: true } | { ok: false, bad, offset, length, sugs: [...] } | { error: true }
   async function checkSpelling(text) {
@@ -450,12 +478,21 @@
     const text = clean($('mEs').value);
     if (!text) return;
     if (!/^[¿¡]?[\p{L} '’-]+[?!]?$/u.test(text)) { msg(`Please type only letters${ES ? ' (you can use the buttons for á, ñ…)' : ''}.`); return; }
-    const known = allWords().find((w) => plain(w.es) === plain(text) || plain(w.es.replace(/^(el|la|los|las) /, '')) === plain(text));
-    if (known) {
-      msg(known.topic === 'mine' ? `“${known.es}” is already in your library.` : `“${known.es}” is already in the word lists (${topicName(known.topic)}): ${known.en}.`);
+    resetAdd();
+    const same = (w) => plain(w.es) === plain(text) || plain(w.es.replace(/^(el|la|los|las) /, '')) === plain(text);
+    const mine = mineWords().find(same);
+    if (mine) {
+      const box = $('mCheck');
+      box.innerHTML = `<p>“<b lang="${L.code}">${esc(mine.es)}</b>” is already in your library (${esc(mine.en)}).</p>
+        <div class="row" style="margin-top:0"><button type="button" class="btn ghost small" id="kLib">📚 Open My library</button>
+        <button type="button" class="btn ghost small" id="kCards">🃏 Practise my library</button></div>`;
+      show('mCheck');
+      $('kLib').onclick = () => showTab('library');
+      $('kCards').onclick = () => practiseLibrary('cards');
       return;
     }
-    resetAdd();
+    const built = BUILT.find(same);
+    if (built) { showPreview(built.es, true, built.en, `It is in the ${topicName(built.topic)} list too.`); return; }
     const btn = $('mCheckBtn');
     btn.disabled = true; btn.textContent = 'Checking…'; msg('');
     const res = await checkSpelling(text);
@@ -513,10 +550,11 @@
   $('mSayBtn').addEventListener('click', sayToAdd);
   if (!SR) $('mSayBtn').title = 'Saying a word works in Chrome and Edge';
 
-  async function showPreview(text, checked) {
+  async function showPreview(text, checked, knownMeaning = '', note = '') {
     pending = text; pendingPron = null;
     $('pEs').textContent = text; $('pEs').lang = L.code;
     $('pChecked').textContent = checked ? '✓ correct spelling' : '';
+    if (note) msg(note);
     $('pIpa').textContent = ipaOf(text);
     $('pSyl').innerHTML = sylHtml(text);
     $('mEn').value = '';
@@ -533,7 +571,7 @@
         $('pSyl').innerHTML = pr ? sylHtml({ es: text, syl: pr.syllables }) : '';
       }).catch(() => { if (pending === text) $('pIpa').textContent = ''; });
     }
-    const en = await meaningOf(text);
+    const en = knownMeaning || await meaningOf(text);
     if (pending !== text) return;
     $('mEn').placeholder = ES ? 'Write the English meaning' : 'Write the meaning';
     if (en && !$('mEn').value) $('mEn').value = en;
@@ -561,10 +599,18 @@
     save(); updateChip();
     resetAdd();
     $('mEs').value = '';
-    msg(`⭐ Added “${es}” to your library.`);
-    renderMine();
-    $('mEs').focus();
+    msg('');
+    $('dWord').textContent = `“${es}”`;
+    $('dCard').innerHTML = cardHtml({ ...entry, topic: 'mine' });
+    show('mDone');
+    $('mDone').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    $('dCards').focus();
   });
+  $('dCard').addEventListener('click', onCards);
+  $('dCards').addEventListener('click', () => practiseLibrary('cards'));
+  $('dQuiz').addEventListener('click', () => practiseLibrary('quiz'));
+  $('dLib').addEventListener('click', () => showTab('library'));
+  $('dMore').addEventListener('click', () => { hide('mDone'); $('mEs').focus(); });
   $('mCancel').addEventListener('click', () => { resetAdd(); msg(''); $('mEs').focus(); });
   // Spanish letters for an English keyboard
   if (ES) {
@@ -593,7 +639,7 @@
     if (name === 'learn') renderLearn();
     if (name === 'cards') fillTopicSelect($('cTopic'));
     if (name === 'quiz') fillTopicSelect($('qTopic'));
-    if (name === 'mine') renderMine();
+    if (name === 'library') renderMine();
   }
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
   function refresh() { updateChip(); showTab(curTab); }

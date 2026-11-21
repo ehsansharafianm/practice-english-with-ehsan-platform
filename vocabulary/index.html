@@ -28,6 +28,7 @@
     <button class="tab" data-tab="cards" role="tab">Flashcards</button>
     <button class="tab" data-tab="quiz" role="tab">Quiz</button>
     <button class="tab" data-tab="mine" role="tab">➕ Add word</button>
+    <button class="tab" data-tab="library" role="tab">📚 My library</button>
   </nav>
 
   <main id="vocabMain">
@@ -142,15 +143,35 @@
           </div>
         </div>
         <p id="mMsg" class="hint" aria-live="polite"></p>
+        <div id="mDone" class="m-done hidden" aria-live="polite">
+          <p class="m-done-head">✓ Added <b id="dWord"></b> to <b>My library</b>. Practise it now:</p>
+          <div id="dCard" class="word-grid one"></div>
+          <div class="row">
+            <button id="dCards" class="btn nav-btn" type="button">🃏 Flashcards with my library</button>
+            <button id="dQuiz" class="btn fav-btn" type="button">❓ Quiz with my library</button>
+            <button id="dLib" class="btn ghost" type="button">📚 Open My library</button>
+            <button id="dMore" class="btn primary" type="button">➕ Add another word</button>
+          </div>
+        </div>
       </div>
+    </section>
+
+    <!-- ============ MY LIBRARY ============ -->
+    <section id="tab-library" class="panel">
       <div class="card">
         <div class="lib-head">
           <h2>My library <span id="mCount" class="muted"></span></h2>
           <input id="mSearch" type="search" placeholder="Search…" aria-label="Search my library">
         </div>
-        <div id="mEmpty" class="empty hidden">Your library is empty. Add your first word above: type it, or say it with 🎙️.</div>
+        <p class="hint">All your words: the ones you added, and every word you have practised in Learn, Flashcards or Quiz. ▶ listen · 🐢 slowly · 🎙️ say it · ✕ remove.</p>
+        <div id="libFilter" class="topic-chips" role="group" aria-label="Show"></div>
+        <div class="row" style="margin-top:0; margin-bottom:12px">
+          <button id="libCards" class="btn nav-btn" type="button">🃏 Flashcards</button>
+          <button id="libQuiz" class="btn fav-btn" type="button">❓ Quiz</button>
+          <button id="libAdd" class="btn primary" type="button">➕ Add word</button>
+        </div>
+        <div id="mEmpty" class="empty hidden">Your library is empty. Add words in <b>➕ Add word</b> (type them or say them), or practise some in Learn.</div>
         <div id="mGrid" class="word-grid"></div>
-        <p class="hint">Your words are also in Learn, Flashcards and Quiz (topic “My library”).</p>
       </div>
     </section>
   </main>
@@ -159,7 +180,7 @@
   <script src="../spanish.js?v=20261120a"></script>
   <script src="../english.js?v=20261120a"></script>
   <script src="words.js?v=20261120a"></script>
-  <script src="app.js?v=20261120h"></script>
+  <script src="app.js?v=20261120i"></script>
   <script type="module" src="../account.js?v=20261120z"></script>
 </body>
 </html>

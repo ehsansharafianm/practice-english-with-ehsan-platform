@@ -682,3 +682,8 @@ code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: .
 .m-meaning-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
 .m-meaning-row input { flex: 1; min-width: 0; padding: 9px 12px; font: inherit; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); }
 #mEs { display: block; width: 100%; margin-top: 6px; padding: 10px 12px; font: inherit; font-size: 1.1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); }
+.m-done { margin-top: 12px; padding: 14px; border-radius: 14px; border: 2px solid var(--good); background: var(--good-bg); display: flex; flex-direction: column; gap: 10px; }
+.m-done-head { margin: 0; font-size: 1.05rem; }
+.word-grid.one { grid-template-columns: minmax(0, 420px); }
+.m-done .wcard { background: var(--card); }
+.lib-item-tag { font-size: .72rem; color: var(--muted); }
