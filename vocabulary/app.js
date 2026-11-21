@@ -221,10 +221,14 @@
   }
 
   // ---------- Learn ----------
-  let topic = TOPICS[0] ? TOPICS[0].id : 'mine';
+  // My library comes first: it is the topic shown until the learner picks another one.
+  let topic = null, topicPicked = false;
+  const hasLibrary = () => libraryWords().length > 0 || !ES;
+  const defaultTopic = () => (hasLibrary() ? 'mine' : TOPICS[0] ? TOPICS[0].id : 'mine');
   function renderTopics() {
+    if (!topicPicked || !topic) topic = defaultTopic();
     const ts = TOPICS.map((t) => ({ ...t, words: wordsOf(t.id) }));
-    if (libraryWords().length || !ES) ts.push({ id: 'mine', name: 'My library', icon: '📚', words: wordsOf('mine') });
+    if (hasLibrary()) ts.unshift({ id: 'mine', name: 'My library', icon: '📚', words: wordsOf('mine') });
     $('lTopics').innerHTML = ts.map((t) => {
       const n = t.words.length, k = t.words.filter(learned).length;
       return `<button type="button" class="topic-chip${t.id === topic ? ' on' : ''}" data-topic="${t.id}" aria-pressed="${t.id === topic}">
@@ -239,22 +243,27 @@
     $('lGrid').innerHTML = list.map((w) => cardHtml(w)).join('')
       || (!q && topic === 'mine' ? '<p class="empty">Your library is empty. Add words in the <b>➕ Add word</b> tab: type them or say them.</p>' : '<p class="empty">No words found.</p>');
   }
-  $('lTopics').addEventListener('click', (e) => { const b = e.target.closest('[data-topic]'); if (!b) return; topic = b.dataset.topic; $('lSearch').value = ''; renderLearn(); });
+  $('lTopics').addEventListener('click', (e) => { const b = e.target.closest('[data-topic]'); if (!b) return; topic = b.dataset.topic; topicPicked = true; $('lSearch').value = ''; renderLearn(); });
   $('lSearch').addEventListener('input', renderLearn);
   $('lGrid').addEventListener('click', onCards);
 
   // ---------- topic menus ----------
+  // Topic menus of Flashcards and Quiz: My library first, and chosen until the learner picks another topic.
   function fillTopicSelect(sel) {
-    const cur = sel.value;
-    sel.innerHTML = (ES ? '<option value="all">All topics</option>' : '') + TOPICS.map((t) => `<option value="${t.id}">${t.icon} ${esc(t.name)}</option>`).join('')
-      + (libraryWords().length || !ES ? '<option value="mine">📚 My library</option>' : '');
-    sel.value = [...sel.options].some((o) => o.value === cur) ? cur : (topic || 'all');
+    const cur = sel.dataset.picked ? sel.value : '';
+    sel.innerHTML = (hasLibrary() ? `<option value="mine">📚 My library (${libraryWords().length})</option>` : '')
+      + (ES ? '<option value="all">All topics</option>' : '') + TOPICS.map((t) => `<option value="${t.id}">${t.icon} ${esc(t.name)}</option>`).join('');
+    sel.value = cur && [...sel.options].some((o) => o.value === cur) ? cur : (hasLibrary() ? 'mine' : 'all');
   }
+  ['cTopic', 'qTopic'].forEach((id) => $(id).addEventListener('change', () => { $(id).dataset.picked = '1'; }));
 
   // ---------- Flashcards ----------
   const fc = { queue: [], i: 0, known: 0, missed: [], total: 0 };
   // Words to study first: lower box first, then the ones not seen for longest, a little shuffled.
-  const due = (list) => list.map((w) => ({ w, k: ((db.words[w.es] || {}).box || 0) * 10 + Math.random() * 6 - ((Date.now() - ((db.words[w.es] || {}).last || 0)) / 864e5 > 3 ? 4 : 0) }))
+  // My own words that I have not practised yet come first.
+  const isMine = (w) => db.mine.some((m) => m.es === w.es);
+  const due = (list) => list.map((w) => ({ w, k: ((db.words[w.es] || {}).box || 0) * 10 + Math.random() * 6 - ((Date.now() - ((db.words[w.es] || {}).last || 0)) / 864e5 > 3 ? 4 : 0)
+      - (isMine(w) && !(db.words[w.es] || {}).last ? 50 : 0) }))
     .sort((a, b) => a.k - b.k).map((x) => x.w);
   $('cStart').addEventListener('click', () => {
     const list = wordsOf($('cTopic').value);
@@ -595,6 +604,8 @@
     const entry = { es, en, added: todayKey() };
     if (!ES && pendingPron) { entry.ipa = pendingPron.ipa; entry.syl = pendingPron.syllables.map((x) => (x.gap ? { gap: true } : { text: x.text, stress: x.stress })); }
     db.mine.push(entry);
+    topic = 'mine'; topicPicked = false; // Learn opens on My library
+    ['cTopic', 'qTopic'].forEach((id) => { delete $(id).dataset.picked; });
     day().newWords++;
     save(); updateChip();
     resetAdd();
