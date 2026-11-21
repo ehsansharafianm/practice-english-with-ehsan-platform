@@ -1,7 +1,8 @@
 /* Spanish Vocabulary — Practice with Ehsan
  * Spanish words (Spain) with English meanings, IPA and stress (../spanish.js), a Spain voice, and three ways to learn:
  * Learn (word cards), Flashcards (words you miss come back sooner), Quiz (4 choices).
- * Learners can add their own words; "Suggest meaning" asks the free MyMemory translation API.
+ * Learners can add their own words: LanguageTool checks the spelling (and suggests the closest Spanish words),
+ * the free MyMemory translation API suggests the English meaning.
  * Guests: saved in this browser. Signed-in students: also saved to their account (es.vocab, see ../account.js).
  */
 (() => {
@@ -358,33 +359,122 @@
     $('mGrid').innerHTML = wordsOf('mine').slice().reverse().map((w) => cardHtml(w, { del: true })).join('');
   }
   $('mGrid').addEventListener('click', onCards);
-  $('mForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const es = clean($('mEs').value), en = clean($('mEn').value);
-    if (!es || !en) return;
-    if (allWords().some((w) => plain(w.es) === plain(es))) { $('mMsg').textContent = `“${es}” is already in the word lists.`; return; }
-    db.mine.push({ es, en, added: todayKey() });
-    save();
-    $('mEs').value = ''; $('mEn').value = '';
-    $('mMsg').textContent = `Added “${es}”.`;
-    renderMine();
-    $('mEs').focus();
-  });
-  $('mSuggest').addEventListener('click', async () => {
-    const es = clean($('mEs').value);
-    if (!es) { $('mMsg').textContent = 'Write the Spanish word first.'; return; }
-    $('mSuggest').disabled = true; $('mMsg').textContent = 'Looking up the meaning…';
+  // Adding a word: check the spelling (LanguageTool), offer the closest Spanish words, then show a preview
+  // (sounds, syllables, English meaning from MyMemory) and add it to My words.
+  let pending = ''; // the word shown in the preview
+  const msg = (t) => { $('mMsg').textContent = t; };
+  function resetAdd() { pending = ''; hide('mCheck', 'mPreview'); $('mEn').value = ''; }
+  $('mEs').addEventListener('input', () => { if (pending || !$('mCheck').classList.contains('hidden')) resetAdd(); msg(''); });
+
+  // -> { ok: true } | { ok: false, bad, offset, length, sugs: [...] } | { error: true }
+  async function checkSpanish(text) {
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
+      const r = await fetch('https://api.languagetool.org/v2/check', {
+        method: 'POST', signal: ctl.signal,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ text, language: 'es' })
+      });
+      clearTimeout(t);
+      if (!r.ok) return { error: true };
+      const j = await r.json();
+      const m = (j.matches || []).find((x) => x.rule && x.rule.issueType === 'misspelling');
+      if (!m) return { ok: true };
+      const bad = text.substr(m.offset, m.length);
+      const sugs = [...new Set((m.replacements || []).map((x) => x.value)
+        .filter((v) => v && (bad.includes(' ') || !v.includes(' ')) && v.toLowerCase() !== bad.toLowerCase()))]
+        .filter((v, i, all) => all.findIndex((x) => plain(x) === plain(v)) === i) // bicicleta / bicicletá: keep the first (closest)
+        .slice(0, 4);
+      return { ok: false, bad, offset: m.offset, length: m.length, sugs };
+    } catch (e) { return { error: true }; }
+  }
+  async function meaningOf(es) {
     try {
       const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
       const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(es)}&langpair=es|en`, { signal: ctl.signal });
       clearTimeout(t);
-      const j = await r.json();
-      const tr = clean(((j || {}).responseData || {}).translatedText || '');
-      if (tr && plain(tr) !== plain(es) && !/MYMEMORY WARNING|INVALID/i.test(tr)) { $('mEn').value = tr; $('mMsg').textContent = 'Suggested meaning added. Check it, then click Add word.'; }
-      else $('mMsg').textContent = 'No meaning found. Please write it yourself.';
-    } catch (err) { $('mMsg').textContent = 'Could not reach the translation service. Please write the meaning yourself.'; }
-    $('mSuggest').disabled = false;
+      const tr = clean((((await r.json()) || {}).responseData || {}).translatedText || '');
+      return tr && plain(tr) !== plain(es) && !/MYMEMORY WARNING|INVALID/i.test(tr) ? tr : '';
+    } catch (e) { return ''; }
+  }
+
+  $('mForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = clean($('mEs').value);
+    if (!text) return;
+    if (!/^[¿¡]?[\p{L} '-]+[?!]?$/u.test(text)) { msg('Please type only Spanish letters (you can use the buttons for á, ñ…).'); return; }
+    const known = allWords().find((w) => plain(w.es) === plain(text) || plain(w.es.replace(/^(el|la|los|las) /, '')) === plain(text));
+    if (known) {
+      msg(known.topic === 'mine' ? `“${known.es}” is already in your words.` : `“${known.es}” is already in the word lists (${topicName(known.topic)}): ${known.en}.`);
+      return;
+    }
+    resetAdd();
+    const btn = $('mCheckBtn');
+    btn.disabled = true; btn.textContent = 'Checking…'; msg('');
+    const res = await checkSpanish(text);
+    btn.disabled = false; btn.textContent = 'Check word';
+    if (res.error) { msg('Could not reach the spell checker, so the spelling was not checked.'); showPreview(text, false); return; }
+    if (res.ok) { showPreview(text, true); return; }
+    // looks misspelled: offer the closest Spanish words
+    const box = $('mCheck');
+    box.innerHTML = `<p>⚠ <b lang="es">“${esc(res.bad)}”</b> doesn't look like a Spanish word.</p>
+      ${res.sugs.length ? `<p class="muted">Did you mean:</p><div class="sugs">${res.sugs.map((sg) => `<button type="button" class="btn ghost small sug" lang="es" data-sug="${esc(sg)}">${esc(sg)}</button>`).join('')}</div>`
+        : '<p class="muted">No close Spanish words found.</p>'}
+      <div class="row" style="margin-top:0">
+        <button type="button" class="btn ghost small" id="mKeep">Use “${esc(text)}” anyway</button>
+        <button type="button" class="btn ghost small" id="mEdit">Edit it myself</button>
+      </div>`;
+    show('mCheck');
+    box.querySelectorAll('[data-sug]').forEach((b) => { b.onclick = () => {
+      $('mEs').value = text.slice(0, res.offset) + b.dataset.sug + text.slice(res.offset + res.length);
+      hide('mCheck');
+      $('mForm').requestSubmit(); // check again (a phrase can have more than one mistake)
+    }; });
+    $('mKeep').onclick = () => { hide('mCheck'); showPreview(text, false); };
+    $('mEdit').onclick = () => { hide('mCheck'); $('mEs').focus(); $('mEs').select(); };
   });
+
+  async function showPreview(text, checked) {
+    pending = text;
+    $('pEs').textContent = text;
+    $('pChecked').textContent = checked ? '✓ correct spelling' : '';
+    $('pIpa').textContent = ipaOf(text);
+    $('pSyl').innerHTML = sylHtml(text);
+    $('mEn').value = '';
+    $('mEn').placeholder = 'Looking up the meaning…';
+    show('mPreview');
+    say(text);
+    const en = await meaningOf(text);
+    if (pending !== text) return;
+    $('mEn').placeholder = 'Write the English meaning';
+    if (en && !$('mEn').value) $('mEn').value = en;
+    if (!en) msg('No meaning found. Please write it yourself.');
+    $('mEn').focus();
+  }
+  $('pSay').addEventListener('click', () => say(pending));
+  $('pSlow').addEventListener('click', () => say(pending, true));
+  $('mSuggest').addEventListener('click', async () => {
+    if (!pending) return;
+    $('mSuggest').disabled = true;
+    const en = await meaningOf(pending);
+    $('mSuggest').disabled = false;
+    if (en) { $('mEn').value = en; msg(''); } else msg('No meaning found. Please write it yourself.');
+  });
+  $('mEn').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('mAdd').click(); } });
+  $('mAdd').addEventListener('click', () => {
+    const es = pending, en = clean($('mEn').value);
+    if (!es) return;
+    if (!en) { msg('Please write the English meaning first.'); $('mEn').focus(); return; }
+    db.mine.push({ es, en, added: todayKey() });
+    day().newWords++;
+    save(); updateChip();
+    resetAdd();
+    $('mEs').value = '';
+    msg(`⭐ Added “${es}” to your words.`);
+    renderMine();
+    $('mEs').focus();
+  });
+  $('mCancel').addEventListener('click', () => { resetAdd(); msg(''); $('mEs').focus(); });
   // Spanish letters for an English keyboard
   {
     const inp = $('mEs');

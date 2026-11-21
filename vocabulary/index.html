@@ -123,16 +123,31 @@
     <section id="tab-mine" class="panel">
       <div class="card">
         <h2>Add your own words</h2>
-        <p class="hint">Write a Spanish word or short phrase and its English meaning. <b>Suggest meaning</b> asks the free MyMemory translation service for it (only the word you typed is sent).</p>
+        <p class="hint">Type a Spanish word or short phrase and click <b>Check word</b>. If the spelling looks wrong, you get the closest Spanish words to choose from.
+          Then you see how to say it and its English meaning, and you can add it to your words.
+          (The word you type is sent to the free LanguageTool spell checker and the MyMemory translation service.)</p>
         <form id="mForm" autocomplete="off">
-          <label>Spanish <input id="mEs" type="text" maxlength="60" required placeholder="p. ej. la mariposa" spellcheck="false"></label>
-          <label>English meaning <input id="mEn" type="text" maxlength="80" required placeholder="e.g. butterfly"></label>
-          <div class="row" style="margin-top:0">
-            <button class="btn primary" type="submit">Add word</button>
-            <button id="mSuggest" class="btn ghost" type="button">💡 Suggest meaning</button>
-          </div>
-          <p id="mMsg" class="hint" aria-live="polite"></p>
+          <label>Spanish word or phrase <input id="mEs" type="text" maxlength="60" required spellcheck="false" autocapitalize="off" aria-describedby="mMsg"></label>
+          <div class="row" style="margin-top:0"><button id="mCheckBtn" class="btn primary" type="submit">Check word</button></div>
         </form>
+        <div id="mCheck" class="spell hidden" aria-live="polite"></div>
+        <div id="mPreview" class="m-preview hidden" aria-live="polite">
+          <div class="w-top"><span id="pEs" class="w-es" lang="es"></span><span id="pChecked" class="w-state ok"></span></div>
+          <div id="pIpa" class="w-ipa"></div>
+          <div id="pSyl" class="w-syl" lang="es"></div>
+          <div class="w-acts">
+            <button id="pSay" type="button" class="btn listen-btn small" title="Listen">▶ Listen</button>
+            <button id="pSlow" type="button" class="btn ghost small" title="Listen slowly">🐢 Slowly</button>
+          </div>
+          <label class="m-meaning">English meaning
+            <span class="m-meaning-row"><input id="mEn" type="text" maxlength="80"><button id="mSuggest" class="btn ghost small" type="button" title="Suggest the meaning again">💡 Suggest</button></span>
+          </label>
+          <div class="row" style="margin-top:4px">
+            <button id="mAdd" class="btn primary" type="button">⭐ Add to my words</button>
+            <button id="mCancel" class="btn ghost" type="button">Cancel</button>
+          </div>
+        </div>
+        <p id="mMsg" class="hint" aria-live="polite"></p>
       </div>
       <div class="card">
         <h2>My words <span id="mCount" class="muted"></span></h2>
@@ -145,7 +160,7 @@
   <footer class="foot"><a class="home-link" href="../">Practice with Ehsan</a> · Spanish Vocabulary</footer>
   <script src="../spanish.js?v=20261120a"></script>
   <script src="words.js?v=20261120a"></script>
-  <script src="app.js?v=20261120a"></script>
+  <script src="app.js?v=20261120c"></script>
   <script type="module" src="../account.js?v=20261120y"></script>
 </body>
 </html>

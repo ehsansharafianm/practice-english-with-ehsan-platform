@@ -677,3 +677,8 @@ code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: .
   .score-rows tr.row-detail > td, #fTable tr.edit-row > td { display: block; }
   #fTable tr.edit-row td::before { content: none; }
 }
+.m-preview { border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
+.m-meaning { margin: 8px 0 0; font-weight: 600; font-size: .95rem; }
+.m-meaning-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.m-meaning-row input { flex: 1; min-width: 0; padding: 9px 12px; font: inherit; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); }
+#mEs { display: block; width: 100%; margin-top: 6px; padding: 10px 12px; font: inherit; font-size: 1.1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); }
